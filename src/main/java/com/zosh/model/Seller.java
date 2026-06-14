@@ -12,6 +12,7 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.OneToMany;
+import jakarta.persistence.OneToOne;
 
 @Entity
 public class Seller {
@@ -37,7 +38,7 @@ public class Seller {
 	private BankDetails bankDetails = new BankDetails();
 	
 	
-	@OneToMany(cascade =  CascadeType.ALL)
+	@OneToOne(cascade =  CascadeType.ALL)
 	private Address pickupAddress = new Address();
 	
 	private String GSTIN;
