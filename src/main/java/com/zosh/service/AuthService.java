@@ -1,5 +1,6 @@
 package com.zosh.service;
 
+import com.zosh.domain.USER_ROLE;
 import com.zosh.model.User;
 import com.zosh.response.AuthResponse;
 import com.zosh.response.LoginRequest;
@@ -10,7 +11,7 @@ public interface AuthService {
 
     String createUser(SignupRequest request);
 
-    void sentLoginOtp(String email);
+    void sentLoginOtp(String email,USER_ROLE roleo);
     
     AuthResponse siging(LoginRequest req);
 

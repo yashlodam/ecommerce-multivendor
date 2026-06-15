@@ -12,6 +12,7 @@ import com.zosh.model.User;
 import com.zosh.model.VerificationCode;
 import com.zosh.response.ApiResponse;
 import com.zosh.response.AuthResponse;
+import com.zosh.response.LoginOtpRequest;
 import com.zosh.response.LoginRequest;
 import com.zosh.response.SignupRequest;
 import com.zosh.service.AuthService;
@@ -39,9 +40,9 @@ public class AuthController {
 	}
 	 @PostMapping("/sent-login-otp")
 	    public ResponseEntity<ApiResponse> sendOtpHandler(
-	            @RequestBody VerificationCode req) {
+	            @RequestBody LoginOtpRequest req) {
 
-	        authservice.sentLoginOtp(req.getEmail());
+	        authservice.sentLoginOtp(req.getEmail(),req.getRole());
 
 	        ApiResponse res = new ApiResponse();
 	        res.setMessage("OTP sent successfully");

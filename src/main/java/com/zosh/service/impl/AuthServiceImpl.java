@@ -18,9 +18,11 @@ import org.springframework.stereotype.Service;
 import com.zosh.config.JwtProvider;
 import com.zosh.domain.USER_ROLE;
 import com.zosh.model.Cart;
+import com.zosh.model.Seller;
 import com.zosh.model.User;
 import com.zosh.model.VerificationCode;
 import com.zosh.repository.CartRepository;
+import com.zosh.repository.SellerRepository;
 import com.zosh.repository.UserRepository;
 import com.zosh.repository.VerificationCodeRepository;
 import com.zosh.response.AuthResponse;
@@ -50,6 +52,9 @@ public class AuthServiceImpl implements AuthService {
 	
 	@Autowired
 	private EmailService emailService;
+	
+	@Autowired
+	private SellerRepository sellerepo;
 	
 	@Autowired
 	private CustomeUserServiceImpl customeUserServiceImpl;
@@ -112,7 +117,7 @@ public class AuthServiceImpl implements AuthService {
 	    return jwtprovider.generateToken(authentication);
 	}
 	@Override
-	public void sentLoginOtp(String email) {
+	public void sentLoginOtp(String email,USER_ROLE role) {
 
 	    String SIGNING_PREFIX = "signin_";
 
@@ -120,13 +125,26 @@ public class AuthServiceImpl implements AuthService {
 
 	        String actualEmail =
 	                email.substring(SIGNING_PREFIX.length());
-
-	        userepo.findByEmail(actualEmail)
+	        
+	        if(role.equals(USER_ROLE.ROLE_SELLER)) {
+	        	
+              Seller seller = sellerepo.findByEmail(actualEmail);
+	        	
+	        	if(seller==null) {
+	        		throw new RuntimeException("seller not found");
+	        	}
+	       
+	        }
+	        else {
+	         	System.out.println("email"+actualEmail);
+		        User user =	userepo.findByEmail(actualEmail)
 	                .orElseThrow(() ->
 	                        new UsernameNotFoundException(
 	                                "User not found with email: "
 	                                        + actualEmail));
+	        }
 
+	        
 	        email = actualEmail;
 	    }
 
@@ -157,7 +175,7 @@ public class AuthServiceImpl implements AuthService {
 	@Override
 	public AuthResponse siging(LoginRequest req) {
 
-	    String username = req.getEmail();
+	    String username = req.getEmail(); // keep prefix
 	    String otp = req.getOtp();
 
 	    Authentication authentication =
@@ -169,15 +187,29 @@ public class AuthServiceImpl implements AuthService {
 	    String token =
 	            jwtprovider.generateToken(authentication);
 
-	    User user = userepo.findByEmail(username)
-	            .orElseThrow(() ->
-	                    new UsernameNotFoundException(
-	                            "User not found"));
-
 	    AuthResponse response = new AuthResponse();
 	    response.setJwt(token);
 	    response.setMessage("Login Success");
-	    response.setRole(user.getRole());
+
+	    if(username.startsWith("seller_")) {
+
+	        String email =
+	                username.substring("seller_".length());
+
+	        Seller seller =
+	                sellerepo.findByEmail(email);
+
+	        response.setRole(seller.getRole());
+
+	    } else {
+
+	        User user = userepo.findByEmail(username)
+	                .orElseThrow(() ->
+	                        new UsernameNotFoundException(
+	                                "User not found"));
+
+	        response.setRole(user.getRole());
+	    }
 
 	    return response;
 	}
@@ -188,8 +220,14 @@ public class AuthServiceImpl implements AuthService {
 	    UserDetails userDetails =
 	            customeUserServiceImpl.loadUserByUsername(username);
 
+	    String email = username;
+
+	    if(username.startsWith("seller_")) {
+	        email = username.substring("seller_".length());
+	    }
+
 	    VerificationCode verificationCode =
-	            repo.findByEmail(username);
+	            repo.findByEmail(email);
 
 	    if (verificationCode == null) {
 	        throw new BadCredentialsException("OTP not found");
@@ -206,5 +244,5 @@ public class AuthServiceImpl implements AuthService {
 	            null,
 	            userDetails.getAuthorities());
 	}
-}
+	}
 
