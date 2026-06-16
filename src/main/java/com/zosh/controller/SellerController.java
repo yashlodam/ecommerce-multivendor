@@ -18,6 +18,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.zosh.config.JwtProvider;
 import com.zosh.domain.AccountStatus;
+import com.zosh.exceptions.SellerException;
 import com.zosh.model.Seller;
 import com.zosh.model.SellerReport;
 import com.zosh.model.VerificationCode;
@@ -115,7 +116,7 @@ public class SellerController {
 	}
 	
 	@GetMapping("/{id}")
-	public ResponseEntity<Seller> getSellerById(@PathVariable Long id){
+	public ResponseEntity<Seller> getSellerById(@PathVariable Long id) throws SellerException{
 		
 		Seller seller = sellerService.getSellerById(id);
 		return new ResponseEntity<>(seller,HttpStatus.OK);
@@ -168,7 +169,7 @@ public class SellerController {
 	}
 	
 	@DeleteMapping("/{id}")
-	public ResponseEntity<Void> deleteSeller(@PathVariable Long id){
+	public ResponseEntity<Void> deleteSeller(@PathVariable Long id) throws SellerException{
 		
 		sellerService.deleteSeller(id);
 		return ResponseEntity.noContent().build();

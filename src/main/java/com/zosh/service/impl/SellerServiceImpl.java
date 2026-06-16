@@ -10,6 +10,7 @@ import org.springframework.stereotype.Service;
 import com.zosh.config.JwtProvider;
 import com.zosh.domain.AccountStatus;
 import com.zosh.domain.USER_ROLE;
+import com.zosh.exceptions.SellerException;
 import com.zosh.model.Address;
 import com.zosh.model.Seller;
 import com.zosh.repository.AddressRepository;
@@ -66,11 +67,12 @@ public class SellerServiceImpl implements SellerService {
 	}
 
 	@Override
-	public Seller getSellerById(Long id) {
+	public Seller getSellerById(Long id) throws SellerException {
 		
 		
 		
-		return sellerepo.findById(id).orElseThrow(()-> new UsernameNotFoundException("seller not found with id"));
+		return sellerepo.findById(id)
+				.orElseThrow(()-> new SellerException("seller not found with id"));
 	}
 
 	@Override
@@ -150,7 +152,7 @@ public class SellerServiceImpl implements SellerService {
 	}
 
 	@Override
-	public void deleteSeller(Long id) {
+	public void deleteSeller(Long id) throws SellerException {
 	
 		Seller seller = getSellerById(id);
 		
@@ -168,7 +170,7 @@ public class SellerServiceImpl implements SellerService {
 	}
 
 	@Override
-	public Seller updateSellerAccountStatus(Long id, AccountStatus status) {
+	public Seller updateSellerAccountStatus(Long id, AccountStatus status) throws SellerException {
 		
 		Seller seller = getSellerById(id);
 		seller.setAccountStatus(status);
