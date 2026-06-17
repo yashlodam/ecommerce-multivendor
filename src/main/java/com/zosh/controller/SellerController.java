@@ -29,6 +29,7 @@ import com.zosh.response.LoginOtpRequest;
 import com.zosh.response.LoginRequest;
 import com.zosh.service.AuthService;
 import com.zosh.service.EmailService;
+import com.zosh.service.SellerReportService;
 import com.zosh.service.SellerService;
 import com.zosh.utils.OtpUtil;
 
@@ -54,6 +55,9 @@ public class SellerController {
 	
 	@Autowired
 	private JwtProvider jwtprovider;
+	
+	@Autowired
+	private SellerReportService sellerReportService;
 	
 
 	
@@ -133,17 +137,16 @@ public class SellerController {
 		return new ResponseEntity<>(seller,HttpStatus.OK);
 	}
 	
-//	@GetMapping("/report")
-//	public ResponseEntity<SellerReport> getSellerReport(
-//			@RequestHeader("Authorization") String jwt
-//			){
-//		
-//		String email = jwtprovider.getEmailFromJwtToken(jwt);
-//		Seller seller = sellerService.getSellerByEmail(email);
-//		
-//		SellerReport report = sellerReportService.getSellerReport(seller);
-//		return new ResponseEntity<>(report,HttpStatus.OK);
-//	}
+	@GetMapping("/report")
+	public ResponseEntity<SellerReport> getSellerReport(
+			@RequestHeader("Authorization") String jwt
+			){
+		
+		Seller seller = sellerService.getSellerProfile(jwt);
+		
+		SellerReport report = sellerReportService.getSellerReport(seller);
+		return new ResponseEntity<>(report,HttpStatus.OK);
+	}
 	
 	
 	
