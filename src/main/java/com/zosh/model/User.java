@@ -35,7 +35,16 @@ public class User {
 	
 	private String mobile;
 	
+	private boolean enabled = true;
 	
+	public boolean isEnabled() {
+		return enabled;
+	}
+
+	public void setEnabled(boolean enabled) {
+		this.enabled = enabled;
+	}
+
 	private USER_ROLE role = USER_ROLE.ROLE_CUSTOMER;
 	
 	

@@ -38,6 +38,17 @@ public class UserServiceImpl implements UserService{
 		return user;
 	}
 
+	@Override
+	public User banUser(Long userId) {
+		User user = userepo.findById(userId)
+	            .orElseThrow(() -> new RuntimeException("User not found"));
+
+	    user.setEnabled(false);
+
+	    return userepo.save(user);
+
+	}
+
 	
 	
 }

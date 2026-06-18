@@ -20,6 +20,17 @@ public class HomeCategory {
 	private String categoryId;
 	
 	private HomeCategorySection section;
+	
+	
+	private Integer priority;
+
+	public Integer getPriority() {
+		return priority;
+	}
+
+	public void setPriority(Integer priority) {
+		this.priority = priority;
+	}
 
 	public Long getId() {
 		return id;

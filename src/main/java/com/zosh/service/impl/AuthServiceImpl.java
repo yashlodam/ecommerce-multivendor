@@ -208,9 +208,12 @@ public class AuthServiceImpl implements AuthService {
 	                        new UsernameNotFoundException(
 	                                "User not found"));
 
+	        if(!user.isEnabled()) {
+	            throw new RuntimeException("Your account has been banned");
+	        }
+
 	        response.setRole(user.getRole());
 	    }
-
 	    return response;
 	}
 	private Authentication authenticate(

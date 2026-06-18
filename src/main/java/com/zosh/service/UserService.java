@@ -7,4 +7,6 @@ public interface UserService {
       User findUserByJwtToken(String jwt);
 	
 	 User findUserByEmail(String email);
+
+	 User banUser(Long userId);
 }

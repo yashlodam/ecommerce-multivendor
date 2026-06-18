@@ -18,6 +18,15 @@ public class Deal {
 	
 	@OneToOne
 	private HomeCategory category;
+	
+    
+
+	public Deal(Long id, Integer discount, HomeCategory category) {
+		super();
+		this.id = id;
+		this.discount = discount;
+		this.category = category;
+	}
 
 	public Long getId() {
 		return id;
