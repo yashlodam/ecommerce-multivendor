@@ -1,5 +1,7 @@
 package com.zosh.service.impl;
 
+import java.util.List;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
@@ -47,6 +49,37 @@ public class UserServiceImpl implements UserService{
 
 	    return userepo.save(user);
 
+	}
+
+	@Override
+	public List<User> getAllUsers() {
+		// TODO Auto-generated method stub
+		return userepo.findAll();
+	}
+
+	@Override
+	public User findUserById(Long id) {
+		// TODO Auto-generated method stub
+		return userepo.findById(id).orElseThrow(()-> new IllegalArgumentException("user not found with given id"));
+	}
+
+	@Override
+	public User unbanUser(Long id) {
+		User user = userepo.findById(id).orElseThrow(()-> new IllegalArgumentException("user not exists with given id"));
+		
+		user.setEnabled(true);
+
+		
+		return userepo.save(user);
+	}
+
+	@Override
+	public void deleteUser(Long id) {
+		
+		User user = userepo.findById(id).orElseThrow(()-> new IllegalArgumentException("user not exists with given id"));
+		
+		userepo.delete(user);
+		
 	}
 
 	

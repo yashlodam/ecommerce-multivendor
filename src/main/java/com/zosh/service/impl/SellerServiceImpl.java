@@ -178,5 +178,11 @@ public class SellerServiceImpl implements SellerService {
 		return sellerepo.save(seller);
 	}
 
+	@Override
+	public List<Seller> getAllSellers() {
+		// TODO Auto-generated method stub
+		return sellerepo.findAll();
+	}
+
 	
 }
