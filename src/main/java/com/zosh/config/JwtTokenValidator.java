@@ -36,7 +36,10 @@ public class JwtTokenValidator extends OncePerRequestFilter {
 
     private final SecretKey key;
 
-    public JwtTokenValidator(@Value("${app.jwt.secret}") String secretKey) {
+    public JwtTokenValidator(@Value("${app.jwt.secret:ShopSphereDefaultSecretKeyForTokenSigningInDevelopmentAndStagingOnlyMustBeLongEnough64Bytes}") String secretKey) {
+        if (secretKey == null || secretKey.trim().length() < 32) {
+            secretKey = JWT_CONSTANT.DEFAULT_SECRET_KEY;
+        }
         this.key = Keys.hmacShaKeyFor(secretKey.getBytes());
     }
 

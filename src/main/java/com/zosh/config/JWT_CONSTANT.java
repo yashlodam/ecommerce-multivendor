@@ -13,4 +13,5 @@ public final class JWT_CONSTANT {
     private JWT_CONSTANT() {}
 
     public static final String JWT_HEADER = "Authorization";
+    public static final String DEFAULT_SECRET_KEY = "ShopSphereDefaultSecretKeyForTokenSigningInDevelopmentAndStagingOnlyMustBeLongEnough64Bytes";
 }

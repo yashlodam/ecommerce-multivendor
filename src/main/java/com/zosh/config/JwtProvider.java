@@ -25,7 +25,7 @@ import jakarta.annotation.PostConstruct;
 @Component
 public class JwtProvider {
 
-    @Value("${app.jwt.secret}")
+    @Value("${app.jwt.secret:ShopSphereDefaultSecretKeyForTokenSigningInDevelopmentAndStagingOnlyMustBeLongEnough64Bytes}")
     private String secretKey;
 
     @Value("${app.jwt.access-token-expiration-ms:${app.jwt.expiration-ms:900000}}")
@@ -35,6 +35,9 @@ public class JwtProvider {
 
     @PostConstruct
     public void init() {
+        if (secretKey == null || secretKey.trim().length() < 32) {
+            secretKey = JWT_CONSTANT.DEFAULT_SECRET_KEY;
+        }
         this.key = Keys.hmacShaKeyFor(secretKey.getBytes());
     }
 
