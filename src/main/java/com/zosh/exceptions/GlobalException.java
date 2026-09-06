@@ -96,6 +96,12 @@ public class GlobalException {
         return buildError(HttpStatus.BAD_REQUEST, "OTP_EXPIRED", ex.getMessage(), req);
     }
 
+    @ExceptionHandler(EmailDeliveryException.class)
+    public ResponseEntity<ErrorDetails> handleEmailDelivery(EmailDeliveryException ex, WebRequest req) {
+        log.error("EmailDeliveryException at {}: {}", req.getDescription(false), ex.getMessage());
+        return buildError(HttpStatus.BAD_GATEWAY, "EMAIL_DELIVERY_ERROR", ex.getMessage(), req);
+    }
+
     @ExceptionHandler(IllegalStateException.class)
     public ResponseEntity<ErrorDetails> handleIllegalState(IllegalStateException ex, WebRequest req) {
         log.warn("IllegalStateException: {}", ex.getMessage());
