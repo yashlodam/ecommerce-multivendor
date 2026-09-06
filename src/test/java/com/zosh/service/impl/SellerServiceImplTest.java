@@ -34,6 +34,9 @@ class SellerServiceImplTest {
     @Mock
     private SellerRepository sellerRepo;
 
+    @Mock
+    private com.zosh.service.NotificationService notificationService;
+
     @Spy
     private PasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
 

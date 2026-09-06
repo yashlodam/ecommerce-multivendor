@@ -58,6 +58,8 @@ class OrderServiceImplTest {
     @Mock private ProductVariantRepository variantRepository;
     @Mock private PricingService pricingService;
     @Mock private DealRepository dealRepository;
+    @Mock private com.zosh.repository.SellerRepository sellerRepository;
+    @Mock private com.zosh.service.NotificationService notificationService;
 
     @InjectMocks private OrderServiceImpl orderService;
 
