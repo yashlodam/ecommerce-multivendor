@@ -58,26 +58,42 @@ git push origin main
 
 ---
 
-## Step 2: Create a PostgreSQL Database
+## Step 2: Create a PostgreSQL Database on Supabase
 
-### Option A: Using Neon.tech (Recommended — Permanent Free Tier)
-1. Go to [Neon.tech](https://neon.tech) and sign up for free.
-2. Click **Create Project** (e.g. name it `shopsphere-db`).
-3. On the project dashboard, copy the **Connection string** (select `Postgres` or `psql`).
-4. The string looks like:
-   `postgresql://username:password@ep-xxxx.us-east-2.aws.neon.tech/neondb?sslmode=require`
-5. Save this URL. You will paste it into Render as `DATABASE_URL`.
+[Supabase](https://supabase.com) provides a **permanent free PostgreSQL database** with 500MB storage, automated daily backups, and no 30-day deletion.
 
-### Option B: Using Render PostgreSQL
-1. Log in to [dashboard.render.com](https://dashboard.render.com).
-2. Click **New +** (top right) ➔ **PostgreSQL**.
-3. Fill in:
-   - **Name**: `shopsphere-db`
-   - **Database**: `ecommerce_multivendor`
-   - **Region**: Choose the region closest to you (e.g., Singapore, Oregon, Frankfurt).
-   - **Plan**: Free
-4. Click **Create Database**.
-5. Once created, copy the **Internal Database URL** (or External Database URL if hosting frontend externally).
+### How to set up Supabase for ShopSphere:
+
+1. **Sign Up / Log In**:
+   - Go to [supabase.com](https://supabase.com) and click **Start your project** (sign in with GitHub).
+2. **Create New Project**:
+   - Click **New project**.
+   - **Name**: `shopsphere` (or any name).
+   - **Database Password**: Choose a strong password and **write it down / save it** (you will need it in the connection string).
+   - **Region**: Choose the same region or closest to your Render service (e.g., *Singapore*, *Frankfurt*, *US East*).
+   - Click **Create new project** (takes ~1-2 minutes to provision).
+3. **Get Your Connection String**:
+   - In your Supabase project dashboard, click the **Project Settings** (gear icon at the bottom of the left sidebar).
+   - Click **Database** under the Configuration section.
+   - Scroll down to **Connection string**.
+   - Click on the **URI** tab.
+   - **CRITICAL STEP**: Check the box **"Use connection pooling"** (or select **Session mode**, Port `5432`).
+     > *Why? Supabase's direct connection is IPv6-only, whereas the Connection Pooler (`pooler.supabase.com`) has full IPv4 support, which ensures 100% reliable connectivity from Render.*
+   - Your connection string will look like this:
+     ```text
+     postgresql://postgres.yourprojectref:[YOUR-PASSWORD]@aws-0-ap-south-1.pooler.supabase.com:5432/postgres
+     ```
+   - Replace `[YOUR-PASSWORD]` with the actual database password you chose in Step 2.
+   - **Save this full URL** — this is your `DATABASE_URL` for Render!
+
+> [!NOTE]
+> **Zero Extra Config Needed**: Our [`DatabaseConfig.java`](file:///c:/Users/SHREE/Documents/workspace-spring-tools-for-eclipse-5.1.1.RELEASE/ecommerce_multivendor/src/main/java/com/zosh/config/DatabaseConfig.java) automatically detects Supabase, extracts the username and password, enforces `sslmode=require`, and configures HikariCP. You do not need to rewrite the URL.
+
+---
+
+### Alternative: Neon.tech or Render PostgreSQL
+- **Neon.tech**: Free permanent serverless Postgres at [neon.tech](https://neon.tech) (copy connection string from dashboard).
+- **Render PostgreSQL**: 30-day free trial on Render (New ➔ PostgreSQL in Render dashboard).
 
 ---
 
