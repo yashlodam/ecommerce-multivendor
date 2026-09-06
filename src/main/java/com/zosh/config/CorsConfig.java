@@ -31,8 +31,11 @@ public class CorsConfig {
 
         CorsConfiguration config = new CorsConfiguration();
 
-        // Parse comma-separated origins from config
-        List<String> allowedOrigins = Arrays.asList(allowedOriginsRaw.split(","));
+        // Parse comma-separated origins from config and trim any surrounding whitespace
+        List<String> allowedOrigins = Arrays.stream(allowedOriginsRaw.split(","))
+                .map(String::trim)
+                .filter(s -> !s.isEmpty())
+                .toList();
         config.setAllowedOrigins(allowedOrigins);
 
         config.setAllowedMethods(Arrays.asList(
