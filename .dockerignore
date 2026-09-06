@@ -1,0 +1,21 @@
+# ==============================================================================
+# Docker Build Context Exclusions
+# ==============================================================================
+.git
+.gitignore
+.idea
+.vscode
+.apt_generated
+.classpath
+.factorypath
+.project
+.settings/
+.springBeans
+.sts4-cache
+target/
+*.log
+.env
+.env.*
+!.env.example
+*.md
+docker-compose*.yml
