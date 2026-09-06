@@ -1,11 +1,14 @@
 package com.zosh.repository;
 
+import java.util.List;
+
 import org.springframework.data.jpa.repository.JpaRepository;
+import com.zosh.model.Product;
+import com.zosh.model.Wishlist;
 
-import com.zosh.model.wishlist;
+public interface WishlistRepository extends JpaRepository<Wishlist, Long> {
 
-public interface wishlistRepository extends JpaRepository<wishlist, Long>{
+    Wishlist findByUserId(Long userId);
 
-	wishlist findByUserId(Long userId);
-	
+    List<Wishlist> findByProductsContaining(Product product);
 }

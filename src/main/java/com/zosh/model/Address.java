@@ -1,106 +1,119 @@
 package com.zosh.model;
 
-import java.util.HashSet;
-import java.util.Set;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
-import jakarta.persistence.ManyToMany;
+import jakarta.persistence.SequenceGenerator;
+import jakarta.persistence.Table;
 
 @Entity
+@Table(name = "addresses")
+@JsonIgnoreProperties(value = {"hibernateLazyInitializer", "handler"}, ignoreUnknown = true)
 public class Address {
 
-	@Id
-	@GeneratedValue(strategy = GenerationType.AUTO)
-	private Long id;
-	
-	
-	private String name;
-	
-	private String locality;
-	
-	private String address;
-	
-	private String city;
-	
-	private String state;
-	
-	private String pinCode;
-	
-	private String mobile;
-	
-	@ManyToMany(mappedBy = "addresses")
-	private Set<User> useraddress = new HashSet<>();
-	
-	 public Address() {
-	    }
+    @Id
+    @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "address_seq")
+    @SequenceGenerator(name = "address_seq", sequenceName = "address_sequence", allocationSize = 1)
+    private Long id;
 
-	public Long getId() {
-		return id;
-	}
+    private String name;
 
-	public void setId(Long id) {
-		this.id = id;
-	}
+    private String locality;
 
-	public String getName() {
-		return name;
-	}
+    private String address;
 
-	public void setName(String name) {
-		this.name = name;
-	}
+    private String city;
 
-	public String getLocality() {
-		return locality;
-	}
+    private String state;
 
-	public void setLocality(String locality) {
-		this.locality = locality;
-	}
+    private String pinCode;
 
-	public String getAddress() {
-		return address;
-	}
+    private String mobile;
 
-	public void setAddress(String address) {
-		this.address = address;
-	}
+    public Address() {
+    }
 
-	public String getCity() {
-		return city;
-	}
+    public Long getId() {
+        return id;
+    }
 
-	public void setCity(String city) {
-		this.city = city;
-	}
+    public void setId(Long id) {
+        this.id = id;
+    }
 
-	public String getState() {
-		return state;
-	}
+    public String getName() {
+        return name;
+    }
 
-	public void setState(String state) {
-		this.state = state;
-	}
+    public void setName(String name) {
+        this.name = name;
+    }
 
-	public String getPinCode() {
-		return pinCode;
-	}
+    public String getLocality() {
+        return locality;
+    }
 
-	public void setPinCode(String pinCode) {
-		this.pinCode = pinCode;
-	}
+    public void setLocality(String locality) {
+        this.locality = locality;
+    }
 
-	public String getMobile() {
-		return mobile;
-	}
+    public String getAddress() {
+        return address;
+    }
 
-	public void setMobile(String mobile) {
-		this.mobile = mobile;
-	}
-	
-	
-	
+    public void setAddress(String address) {
+        this.address = address;
+    }
+
+    public String getCity() {
+        return city;
+    }
+
+    public void setCity(String city) {
+        this.city = city;
+    }
+
+    public String getState() {
+        return state;
+    }
+
+    public void setState(String state) {
+        this.state = state;
+    }
+
+    public String getPinCode() {
+        return pinCode;
+    }
+
+    public void setPinCode(String pinCode) {
+        this.pinCode = pinCode;
+    }
+
+    public void setPincode(String pincode) {
+        this.pinCode = pincode;
+    }
+
+    public String getMobile() {
+        return mobile;
+    }
+
+    public void setMobile(String mobile) {
+        this.mobile = mobile;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        Address address = (Address) o;
+        return id != null && id.equals(address.id);
+    }
+
+    @Override
+    public int hashCode() {
+        return id != null ? id.hashCode() : getClass().hashCode();
+    }
 }

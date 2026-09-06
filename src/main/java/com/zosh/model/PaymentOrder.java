@@ -1,98 +1,114 @@
 package com.zosh.model;
 
-import java.util.HashSet;
-import java.util.Set;
-
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.zosh.domain.PaymentMethod;
 import com.zosh.domain.PaymentOrderStatus;
 
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.Index;
+import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
-import jakarta.persistence.OneToMany;
+import jakarta.persistence.SequenceGenerator;
+import jakarta.persistence.Table;
 
 @Entity
+@Table(
+    name = "payment_orders",
+    indexes = {
+        @Index(name = "idx_pay_order_link_id", columnList = "paymentLinkId"),
+        @Index(name = "idx_pay_order_user_id", columnList = "user_id"),
+        @Index(name = "idx_pay_order_status", columnList = "status")
+    }
+)
+@JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
 public class PaymentOrder {
 
-	@Id
-	@GeneratedValue(strategy = GenerationType.AUTO)
-	private Long id;
-	
-	private Long amount;
-	
-	private PaymentOrderStatus status = PaymentOrderStatus.PENDING;
-	
-	private PaymentMethod paymentMethod;
-	
-	
-	
-	private String paymentLinkId;
-	
-	@ManyToOne
-	private User user;
-	
-	@OneToMany
-	private Set<Order> orders = new HashSet<>();
+    @Id
+    @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "pay_order_seq")
+    @SequenceGenerator(name = "pay_order_seq", sequenceName = "payment_order_sequence", allocationSize = 1)
+    private Long id;
 
-	public Long getId() {
-		return id;
-	}
+    private Long amount;
 
-	public void setId(Long id) {
-		this.id = id;
-	}
+    @Enumerated(EnumType.STRING)
+    private PaymentOrderStatus status = PaymentOrderStatus.PENDING;
 
-	public Long getAmount() {
-		return amount;
-	}
+    @Enumerated(EnumType.STRING)
+    private PaymentMethod paymentMethod;
 
-	public void setAmount(Long amount) {
-		this.amount = amount;
-	}
+    private String paymentLinkId;
 
-	public PaymentOrderStatus getStatus() {
-		return status;
-	}
+    @ManyToOne
+    @JoinColumn(name = "user_id")
+    @JsonIgnoreProperties({"addresses", "usedCoupons", "password", "hibernateLazyInitializer", "handler"})
+    private User user;
 
-	public void setStatus(PaymentOrderStatus status) {
-		this.status = status;
-	}
+    @ManyToOne
+    @JoinColumn(name = "shipping_address_id")
+    @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
+    private Address shippingAddress;
 
-	public PaymentMethod getPaymentMethod() {
-		return paymentMethod;
-	}
+    public PaymentOrder() {
+    }
 
-	public void setPaymentMethod(PaymentMethod paymentMethod) {
-		this.paymentMethod = paymentMethod;
-	}
+    public Long getId() {
+        return id;
+    }
 
-	public String getPaymentLinkId() {
-		return paymentLinkId;
-	}
+    public void setId(Long id) {
+        this.id = id;
+    }
 
-	public void setPaymentLinkId(String paymentLinkId) {
-		this.paymentLinkId = paymentLinkId;
-	}
+    public Long getAmount() {
+        return amount;
+    }
 
-	public User getUser() {
-		return user;
-	}
+    public void setAmount(Long amount) {
+        this.amount = amount;
+    }
 
-	public void setUser(User user) {
-		this.user = user;
-	}
+    public PaymentOrderStatus getStatus() {
+        return status;
+    }
 
-	public Set<Order> getOrders() {
-		return orders;
-	}
+    public void setStatus(PaymentOrderStatus status) {
+        this.status = status;
+    }
 
-	public void setOrders(Set<Order> orders) {
-		this.orders = orders;
-	}
-	
-	
-	
-	
+    public PaymentMethod getPaymentMethod() {
+        return paymentMethod;
+    }
+
+    public void setPaymentMethod(PaymentMethod paymentMethod) {
+        this.paymentMethod = paymentMethod;
+    }
+
+    public String getPaymentLinkId() {
+        return paymentLinkId;
+    }
+
+    public void setPaymentLinkId(String paymentLinkId) {
+        this.paymentLinkId = paymentLinkId;
+    }
+
+    public User getUser() {
+        return user;
+    }
+
+    public void setUser(User user) {
+        this.user = user;
+    }
+
+    public Address getShippingAddress() {
+        return shippingAddress;
+    }
+
+    public void setShippingAddress(Address shippingAddress) {
+        this.shippingAddress = shippingAddress;
+    }
 }

@@ -4,103 +4,121 @@ import java.time.LocalDate;
 import java.util.HashSet;
 import java.util.Set;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
+import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.Index;
 import jakarta.persistence.ManyToMany;
+import jakarta.persistence.SequenceGenerator;
+import jakarta.persistence.Table;
 
 @Entity
+@Table(
+    name = "coupons",
+    indexes = {
+        @Index(name = "idx_coupon_code", columnList = "code", unique = true),
+        @Index(name = "idx_coupon_active", columnList = "isActive")
+    }
+)
+@JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
 public class Coupon {
 
-	@Id
-	@GeneratedValue(strategy = GenerationType.AUTO)
-	private Long id;
-	
-	
-	private String code;
-	
-	private double discountPercentage;
-	
-	private LocalDate validityStartDate;
-	
-	private LocalDate validityEndDate;
-	
-	private double minimumOrderValue;
-	
-	private boolean isActive = true;
-	
-	@ManyToMany(mappedBy = "usedCoupons")
-	private Set<User> usedByUsers = new HashSet<>();
-	
-	 public String getCode() {
-		return code;
-	}
+    @Id
+    @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "coupon_seq")
+    @SequenceGenerator(name = "coupon_seq", sequenceName = "coupon_sequence", allocationSize = 1)
+    private Long id;
 
-	public Set<User> getUsedByUsers() {
-		return usedByUsers;
-	}
+    @Column(unique = true, nullable = false)
+    private String code;
 
-	 public void setUsedByUsers(Set<User> usedByUsers) {
-		 this.usedByUsers = usedByUsers;
-	 }
+    @Column(nullable = false)
+    private double discountPercentage;
 
-	public void setCode(String code) {
-		this.code = code;
-	}
+    @Column(nullable = false)
+    private LocalDate validityStartDate;
 
-	public double getDiscountPercentage() {
-		return discountPercentage;
-	}
+    @Column(nullable = false)
+    private LocalDate validityEndDate;
 
-	public void setDiscountPercentage(double discountPercentage) {
-		this.discountPercentage = discountPercentage;
-	}
+    @Column(nullable = false)
+    private double minimumOrderValue;
 
-	public LocalDate getValidityStartDate() {
-		return validityStartDate;
-	}
+    @Column(nullable = false)
+    private boolean isActive = true;
 
-	public void setValidityStartDate(LocalDate validityStartDate) {
-		this.validityStartDate = validityStartDate;
-	}
+    @JsonIgnore
+    @ManyToMany(mappedBy = "usedCoupons")
+    private Set<User> usedByUsers = new HashSet<>();
 
-	public LocalDate getValidityEndDate() {
-		return validityEndDate;
-	}
+    public Coupon() {
+    }
 
-	public void setValidityEndDate(LocalDate validityEndDate) {
-		this.validityEndDate = validityEndDate;
-	}
+    public Long getId() {
+        return id;
+    }
 
-	public double getMinimumOrderValue() {
-		return minimumOrderValue;
-	}
+    public void setId(Long id) {
+        this.id = id;
+    }
 
-	public void setMinimumOrderValue(double minimumOrderValue) {
-		this.minimumOrderValue = minimumOrderValue;
-	}
+    public String getCode() {
+        return code;
+    }
 
-	public boolean isActive() {
-		return isActive;
-	}
+    public void setCode(String code) {
+        this.code = code;
+    }
 
-	public void setActive(boolean isActive) {
-		this.isActive = isActive;
-	}
+    public double getDiscountPercentage() {
+        return discountPercentage;
+    }
 
-	 public Coupon() {
-	    }
+    public void setDiscountPercentage(double discountPercentage) {
+        this.discountPercentage = discountPercentage;
+    }
 
-	 public Long getId() {
-		 return id;
-	 }
+    public LocalDate getValidityStartDate() {
+        return validityStartDate;
+    }
 
-	 public void setId(Long id) {
-		 this.id = id;
-	 }
-	 
-	 
-	
-	
+    public void setValidityStartDate(LocalDate validityStartDate) {
+        this.validityStartDate = validityStartDate;
+    }
+
+    public LocalDate getValidityEndDate() {
+        return validityEndDate;
+    }
+
+    public void setValidityEndDate(LocalDate validityEndDate) {
+        this.validityEndDate = validityEndDate;
+    }
+
+    public double getMinimumOrderValue() {
+        return minimumOrderValue;
+    }
+
+    public void setMinimumOrderValue(double minimumOrderValue) {
+        this.minimumOrderValue = minimumOrderValue;
+    }
+
+    public boolean isActive() {
+        return isActive;
+    }
+
+    public void setActive(boolean active) {
+        isActive = active;
+    }
+
+    public Set<User> getUsedByUsers() {
+        return usedByUsers;
+    }
+
+    public void setUsedByUsers(Set<User> usedByUsers) {
+        this.usedByUsers = usedByUsers;
+    }
 }

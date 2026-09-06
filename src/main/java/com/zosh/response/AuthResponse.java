@@ -7,6 +7,15 @@ public class AuthResponse {
 	private String jwt;
 	private String message;
 	private USER_ROLE role;
+
+	public AuthResponse() {
+	}
+
+	public AuthResponse(String jwt, String message, USER_ROLE role) {
+		this.jwt = jwt;
+		this.message = message;
+		this.role = role;
+	}
 	public String getJwt() {
 		return jwt;
 	}

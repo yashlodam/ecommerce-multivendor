@@ -41,6 +41,9 @@ Thumbs.db
 application-local.properties
 application-dev.properties
 .env
+.env.*
+.env.local
+!.env.example
 
 # Java
 *.class

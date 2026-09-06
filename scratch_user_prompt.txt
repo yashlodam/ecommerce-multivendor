@@ -1,0 +1,706 @@
+<USER_REQUEST>
+You are a senior Spring Boot security engineer and OpenAPI/Swagger integration expert.
+
+I have an existing multi-vendor e-commerce application called:
+
+SHOPSPHERE
+
+Tech stack:
+- Java
+- Spring Boot
+- Spring Security
+- JWT
+- Spring Data JPA
+- Hibernate
+- MySQL/PostgreSQL
+- Springdoc OpenAPI / Swagger UI
+- React frontend
+
+========================================================
+CURRENT PROBLEM
+========================================================
+
+I have migrated authentication so that the JWT/authentication token is stored in a COOKIE rather than localStorage.
+
+Because of this, Swagger UI currently cannot easily authenticate protected APIs using:
+
+Authorize
+→ Bearer <JWT>
+
+I want Swagger UI to work correctly with my CURRENT cookie-based authentication architecture.
+
+IMPORTANT:
+
+DO NOT move the JWT back to localStorage.
+
+DO NOT weaken authentication security.
+
+DO NOT expose HttpOnly cookies to JavaScript.
+
+DO NOT create a fake Swagger authentication system.
+
+First inspect the CURRENT authentication implementation and determine exactly which token is stored in which cookie.
+
+========================================================
+PHASE 1 — INSPECT CURRENT AUTHENTICATION
+========================================================
+
+Inspect:
+
+- SecurityConfig
+- SecurityFilterChain
+- JWT filter
+- JWT utility/service
+- authentication controller
+- login endpoint
+- refresh endpoint if present
+- logout endpoint
+- authentication response DTO
+- cookie creation code
+- cookie deletion code
+- cookie name
+- HttpOnly
+- Secure
+- SameSite
+- Path
+- Domain
+- JWT extraction logic
+- Authorization header handling
+- Spring Security context
+- CORS
+- CSRF
+- Swagger/OpenAPI configuration
+
+Determine:
+
+1. Is the ACCESS JWT stored in a cookie?
+2. Is only the REFRESH TOKEN stored in a cookie?
+3. Is the access token returned in JSON?
+4. What is the exact cookie name?
+5. Is the cookie HttpOnly?
+6. Does Spring Security currently read JWT from cookies?
+7. Does the frontend send requests with credentials?
+8. What is the frontend origin?
+9. What is the backend origin?
+10. What is the current Swagger origin?
+
+DO NOT ASSUME.
+
+Inspect the actual code.
+
+========================================================
+PHASE 2 — IDENTIFY THE CURRENT TOKEN ARCHITECTURE
+========================================================
+
+Determine which of these architectures is currently implemented.
+
+ARCHITECTURE A:
+
+Access JWT
+→ HttpOnly cookie
+
+Refresh token
+→ HttpOnly cookie
+
+OR
+
+ARCHITECTURE B:
+
+Access JWT
+→ returned in JSON / held in memory
+
+Refresh token
+→ HttpOnly cookie
+
+OR
+
+another existing architecture.
+
+Do NOT change the architecture unless absolutely necessary.
+
+Swagger must be adapted to the existing secure design.
+
+========================================================
+PHASE 3 — SWAGGER AUTHENTICATION
+========================================================
+
+Configure Swagger/OpenAPI correctly for the CURRENT authentication mechanism.
+
+If the access JWT is stored in a cookie:
+
+Swagger should use cookie-based authentication instead of expecting:
+
+Bearer <JWT>
+
+For example, use an OpenAPI security scheme based on:
+
+type = apiKey
+in = cookie
+
+with the REAL cookie name.
+
+Do NOT invent the cookie name.
+
+Use the actual configured cookie name from the code.
+
+========================================================
+PHASE 4 — IMPORTANT HTTPONLY RULE
+========================================================
+
+If the cookie is:
+
+HttpOnly=true
+
+Swagger/browser JavaScript must NOT attempt to read its value.
+
+Do NOT implement:
+
+document.cookie
+
+to extract the JWT.
+
+Do NOT expose the token to JavaScript merely to make Swagger work.
+
+The browser should send the cookie automatically where allowed.
+
+========================================================
+PHASE 5 — SWAGGER COOKIE FLOW
+========================================================
+
+Make Swagger work like this when the architecture permits:
+
+1. Open Swagger UI.
+2. Call login endpoint.
+3. Backend authenticates.
+4. Backend sets authentication cookie.
+5. Browser stores the cookie.
+6. Swagger requests protected APIs.
+7. Browser sends the cookie automatically.
+8. Spring Security reads the cookie.
+9. JWT is validated.
+10. Protected API succeeds.
+
+Do NOT require the user to manually copy the JWT if the JWT is HttpOnly.
+
+========================================================
+PHASE 6 — SWAGGER UI CREDENTIALS
+========================================================
+
+Inspect whether Swagger UI requests are going to the same origin or a different origin from the backend.
+
+If Swagger UI is served by the Spring Boot backend, verify cookie behavior for same-origin requests.
+
+If frontend/backend are different origins, configure CORS and credentials correctly.
+
+Do NOT use:
+
+allowedOrigins("*")
+
+with credentialed requests.
+
+Use explicit trusted origins.
+
+========================================================
+PHASE 7 — SPRINGDOC / OPENAPI CONFIGURATION
+========================================================
+
+Inspect the current OpenAPI configuration.
+
+If the authentication uses a cookie, configure something conceptually similar to:
+
+new SecurityScheme()
+    .type(SecurityScheme.Type.APIKEY)
+    .in(SecurityScheme.In.COOKIE)
+    .name("ACTUAL_COOKIE_NAME");
+
+Use the actual cookie name found in the existing implementation.
+
+Do not blindly add both Bearer and cookie schemes unless both are genuinely supported.
+
+========================================================
+PHASE 8 — APPLY SECURITY TO PROTECTED ENDPOINTS
+========================================================
+
+Ensure protected APIs are correctly documented in OpenAPI.
+
+For example, endpoints such as:
+
+- cart
+- orders
+- customer profile
+- seller APIs
+- admin APIs
+
+should show the appropriate security requirements.
+
+Do not mark public endpoints as protected unnecessarily.
+
+Do not mark protected endpoints as public just to make Swagger work.
+
+========================================================
+PHASE 9 — LOGIN THROUGH SWAGGER
+========================================================
+
+Make it possible to test authentication through Swagger.
+
+Test:
+
+POST /api/auth/login
+
+After successful login:
+
+- verify Set-Cookie response
+- verify browser stores cookie
+- verify cookie attributes
+- verify subsequent protected Swagger requests include the cookie
+
+Do NOT return the refresh token just for Swagger.
+
+Do NOT weaken HttpOnly.
+
+========================================================
+PHASE 10 — IF ACCESS TOKEN IS NOT COOKIE-BASED
+========================================================
+
+If the actual architecture is:
+
+Access token → returned in login JSON
+Refresh token → HttpOnly cookie
+
+then Swagger should use the access token through:
+
+Authorize
+→ Bearer <access-token>
+
+while the refresh token remains HttpOnly.
+
+DO NOT incorrectly configure Swagger to use the refresh token.
+
+First determine the actual architecture from the code.
+
+========================================================
+PHASE 11 — REFRESH FLOW
+========================================================
+
+If a refresh endpoint exists:
+
+POST /api/auth/refresh
+
+verify whether Swagger/browser can send the refresh cookie correctly.
+
+The refresh token must remain inaccessible to JavaScript if HttpOnly is intended.
+
+Swagger should not require manually entering the refresh token.
+
+========================================================
+PHASE 12 — LOGOUT
+========================================================
+
+Test:
+
+POST /api/auth/logout
+
+Verify:
+
+- refresh/auth cookie is cleared correctly
+- server-side token/session is revoked if supported
+- protected APIs no longer work when authentication is invalid
+- Swagger does not retain stale authentication unexpectedly
+
+========================================================
+PHASE 13 — CORS
+========================================================
+
+Inspect current frontend/backend deployment.
+
+If Swagger UI and backend are cross-origin, configure:
+
+Access-Control-Allow-Origin
+Access-Control-Allow-Credentials
+
+correctly.
+
+Use explicit origins.
+
+Do NOT use wildcard origin with credentials.
+
+Ensure OPTIONS/preflight behavior is correct.
+
+========================================================
+PHASE 14 — CSRF
+========================================================
+
+Because authentication may depend on cookies, audit CSRF carefully.
+
+DO NOT blindly use:
+
+csrf().disable()
+
+without understanding the current architecture.
+
+Determine whether cookie-authenticated requests require CSRF protection.
+
+If access JWT is only sent through Authorization headers and refresh is cookie-based, assess the different CSRF implications correctly.
+
+Keep the implementation secure.
+
+========================================================
+PHASE 15 — COOKIE CONFIGURATION
+========================================================
+
+Audit:
+
+- HttpOnly
+- Secure
+- SameSite
+- Path
+- Max-Age
+- Domain
+
+Verify the cookie settings are appropriate for:
+
+development
+and
+production.
+
+Do not weaken production security merely because localhost behaves differently.
+
+========================================================
+PHASE 16 — SPRING SECURITY JWT EXTRACTION
+========================================================
+
+Inspect the JWT filter.
+
+If the architecture uses cookie-based access JWT, ensure the filter can correctly extract the JWT from the configured cookie.
+
+For example, conceptually:
+
+Request
+→ read configured authentication cookie
+→ extract JWT
+→ validate JWT
+→ create Authentication
+→ SecurityContext
+→ continue filter chain
+
+Do not assume the JWT filter currently supports cookies.
+
+Fix it if necessary.
+
+If the architecture uses Authorization header for access JWT, preserve that instead.
+
+========================================================
+PHASE 17 — DO NOT BREAK FRONTEND AUTHENTICATION
+========================================================
+
+Do not redesign the frontend.
+
+Only make minimal changes if necessary for:
+
+- credentials: include
+- authentication cookie behavior
+- refresh requests
+- logout
+
+Do not reintroduce localStorage JWT.
+
+Do not store authentication cookies manually from JavaScript.
+
+========================================================
+PHASE 18 — SWAGGER URL
+========================================================
+
+Ensure Swagger UI is accessible from the correct URL based on the actual project configuration.
+
+Verify:
+
+/swagger-ui/index.html
+
+and:
+
+/v3/api-docs
+
+work correctly.
+
+Do not assume the port.
+
+Use the actual configured server port.
+
+========================================================
+PHASE 19 — TEST CASES
+========================================================
+
+Test the following.
+
+TEST 1:
+Open Swagger.
+
+Expected:
+Swagger UI loads.
+
+TEST 2:
+Open /v3/api-docs.
+
+Expected:
+Valid OpenAPI document.
+
+TEST 3:
+Login through Swagger.
+
+Expected:
+Successful authentication.
+
+TEST 4:
+Inspect login response.
+
+Expected:
+Correct Set-Cookie behavior.
+
+TEST 5:
+Call public API.
+
+Expected:
+Success.
+
+TEST 6:
+Call protected API without authentication.
+
+Expected:
+401 Unauthorized.
+
+TEST 7:
+Login, then call protected API.
+
+Expected:
+200/appropriate success response.
+
+TEST 8:
+Call seller API with customer authentication.
+
+Expected:
+403 Forbidden where appropriate.
+
+TEST 9:
+Call admin API with customer authentication.
+
+Expected:
+403 Forbidden where appropriate.
+
+TEST 10:
+Logout.
+
+Expected:
+Authentication cookie cleared/revoked appropriately.
+
+TEST 11:
+Call protected API after logout.
+
+Expected:
+401 Unauthorized.
+
+TEST 12:
+Test refresh endpoint if present.
+
+Expected:
+New access authentication is created correctly.
+
+========================================================
+PHASE 20 — BROWSER DEVTOOLS VERIFICATION
+========================================================
+
+Actually verify in browser DevTools:
+
+Application
+→ Cookies
+
+and:
+
+Network
+→ login
+→ protected API
+
+Check:
+
+- Set-Cookie
+- Cookie
+- HttpOnly
+- Secure
+- SameSite
+- Authorization header if applicable
+- response status
+- CORS headers
+- credentials behavior
+
+Do not just assume cookies are being sent.
+
+========================================================
+PHASE 21 — ERROR HANDLING
+========================================================
+
+Ensure authentication failures return proper responses:
+
+401 Unauthorized
+403 Forbidden
+
+Do not expose:
+
+- JWT details
+- token parsing internals
+- secrets
+- stack traces
+
+========================================================
+PHASE 22 — SECURITY REVIEW
+========================================================
+
+Perform a second security review after implementation.
+
+Look for:
+
+- token exposed to JavaScript
+- JWT in localStorage
+- JWT in sessionStorage
+- refresh token exposed in response
+- insecure cookie
+- missing HttpOnly
+- missing Secure in production
+- incorrect SameSite
+- wildcard CORS
+- incorrect credentials handling
+- CSRF weakness
+- refresh token misuse
+- access token used as refresh token
+- refresh token used as bearer token
+- broken logout
+- broken role authorization
+
+Fix everything found.
+
+========================================================
+PHASE 23 — DO NOT MAKE BAD SHORTCUTS
+========================================================
+
+DO NOT:
+
+- move JWT back to localStorage
+- disable Spring Security
+- disable CSRF blindly
+- allow all origins
+- remove authentication from Swagger endpoints
+- return refresh tokens in JSON
+- expose HttpOnly cookie through JavaScript
+- hardcode JWT secrets
+- create a fake Swagger auth token
+- bypass authorization
+- create special insecure endpoints only for Swagger
+
+Swagger must test the REAL authentication system.
+
+========================================================
+PHASE 24 — FINAL ARCHITECTURE
+========================================================
+
+Depending on the actual existing implementation, the final architecture must be one of:
+
+OPTION A:
+
+Access JWT
+→ HttpOnly secure cookie
+
+Swagger/browser
+→ automatically sends cookie
+
+Spring Security
+→ reads cookie
+→ validates JWT
+
+OR:
+
+OPTION B:
+
+Access JWT
+→ short-lived token returned to client / memory
+
+Refresh token
+→ HttpOnly secure cookie
+
+Swagger
+→ Bearer access token for protected endpoints
+
+Refresh
+→ cookie automatically sent
+
+Do not mix these incorrectly.
+
+========================================================
+PHASE 25 — BUILD AND RUN
+========================================================
+
+After implementation:
+
+1. Compile the backend.
+2. Start Spring Boot.
+3. Open Swagger.
+4. Open /v3/api-docs.
+5. Login.
+6. Verify cookie.
+7. Test protected API.
+8. Test unauthorized API.
+9. Test role authorization.
+10. Test refresh.
+11. Test logout.
+12. Inspect browser Network tab.
+13. Inspect Application → Cookies.
+14. Check backend logs.
+15. Fix all issues.
+16. Run all tests again.
+
+========================================================
+FINAL REPORT
+========================================================
+
+Provide:
+
+1. Current authentication architecture discovered
+2. Actual token storage mechanism
+3. Actual cookie name
+4. Swagger configuration changes
+5. Spring Security changes
+6. JWT filter changes
+7. CORS changes
+8. CSRF strategy
+9. Login flow
+10. Refresh flow
+11. Logout flow
+12. Files created
+13. Files modified
+14. Tests performed
+15. Swagger testing instructions
+16. Any remaining issue
+
+For the final Swagger instructions, explicitly tell me:
+
+A. How to login
+B. Whether Swagger needs the Authorize button
+C. Whether I need to enter "Bearer <token>"
+D. Whether cookies are automatically sent
+E. How to test a protected GET
+F. How to test a protected POST
+G. How to test 401
+H. How to test 403
+
+MOST IMPORTANT:
+
+Do not assume whether the JWT is an access token or refresh token.
+
+Inspect the code first.
+
+Do not move authentication back to localStorage.
+
+Make Swagger work with the REAL secure authentication architecture already implemented in ShopSphere.
+
+Actually modify the code, run it, test it, inspect browser behavior, perform a second security review, and fix all issues found.
+</USER_REQUEST>
+<ADDITIONAL_METADATA>
+The current local time is: 2026-09-05T13:00:42+05:30.
+</ADDITIONAL_METADATA>

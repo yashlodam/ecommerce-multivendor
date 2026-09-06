@@ -5,18 +5,20 @@ import java.util.List;
 import org.springframework.data.domain.Page;
 
 import com.zosh.model.Product;
+import com.zosh.model.ProductVariant;
 import com.zosh.model.Seller;
 import com.zosh.request.CreateProductRequest;
+import com.zosh.request.ProductVariantRequest;
 
 public interface ProductService {
 
-    // Create
+    // ─── Product CRUD ──────────────────────────────────────────────
     Product createProduct(CreateProductRequest req, Seller seller);
 
-    // Read
     Product findProductById(Long id);
 
     Page<Product> getAllProducts(
+            String query,
             String category,
             String brand,
             String colors,
@@ -34,15 +36,19 @@ public interface ProductService {
 
     List<Product> getRelatedProducts(Long productId);
 
-    // Search
+    // ─── Search ────────────────────────────────────────────────────
     List<Product> searchProducts(String query);
 
     List<Product> searchProductsByCategory(String category);
 
     List<Product> searchProductsByBrand(String brand);
 
-    // Update
+    // ─── Product Update ────────────────────────────────────────────
     Product updateProduct(Long id, CreateProductRequest req);
+
+    Product updateProduct(Long id, Product updatedProduct);
+
+    Product updateProduct(Long id, Product updatedProduct, Long sellerId);
 
     Product updateProductStatus(Long id);
 
@@ -52,22 +58,24 @@ public interface ProductService {
 
     Product updateProductDiscount(Long productId, Integer discountPercent);
 
-    // Delete
+    // ─── Product Delete ────────────────────────────────────────────
     void deleteProduct(Long id);
 
-    // Inventory
+    void deleteProduct(Long id, Long sellerId);
+
+    // ─── Inventory ─────────────────────────────────────────────────
     boolean isProductInStock(Long productId);
 
     Integer getAvailableQuantity(Long productId);
 
-    // Seller Operations
+    // ─── Seller Analytics ──────────────────────────────────────────
     Long getTotalProductsBySeller(Long sellerId);
 
     List<Product> getActiveProductsBySeller(Long sellerId);
 
     List<Product> getInactiveProductsBySeller(Long sellerId);
 
-    // Admin Operations
+    // ─── Admin Operations ──────────────────────────────────────────
     List<Product> getPendingProducts();
 
     List<Product> getApprovedProducts();
@@ -76,12 +84,43 @@ public interface ProductService {
 
     Product rejectProduct(Long productId);
 
-    // Analytics
+    // ─── Platform Analytics ────────────────────────────────────────
     Long getTotalProducts();
 
     Long getTotalActiveProducts();
 
     Long getOutOfStockProductsCount();
 
-	Product updateProduct(Long id, Product updatedProduct);
+    // ─── Variant CRUD ──────────────────────────────────────────────
+
+    /** Get all variants for a product */
+    List<ProductVariant> getVariantsByProductId(Long productId);
+
+    /**
+     * Create a new variant for a product (seller-scoped — sellerId enforces ownership).
+     */
+    ProductVariant createVariant(Long productId, ProductVariantRequest req, Long sellerId);
+
+    /**
+     * Update an existing variant (seller-scoped — sellerId enforces ownership).
+     */
+    ProductVariant updateVariant(Long variantId, ProductVariantRequest req, Long sellerId);
+
+    /**
+     * Delete a variant (seller-scoped — sellerId enforces ownership).
+     * Throws if only one variant remains (a product must always have at least one).
+     */
+    void deleteVariant(Long variantId, Long sellerId);
+
+    // ─── Real Brand Discovery ──────────────────────────────────────
+
+    /**
+     * Get all distinct, non-empty brand names in the product catalog.
+     */
+    List<String> getAllBrands();
+
+    /**
+     * Get distinct brand names scoped by category and/or keyword query.
+     */
+    List<String> getDistinctBrands(String category, String query);
 }

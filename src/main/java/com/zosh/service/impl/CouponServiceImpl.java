@@ -6,8 +6,12 @@ import java.util.List;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
+import com.zosh.exceptions.DuplicateResourceException;
+import com.zosh.exceptions.ResourceNotFoundException;
 import com.zosh.model.Cart;
+import com.zosh.model.CartItem;
 import com.zosh.model.Coupon;
 import com.zosh.model.User;
 import com.zosh.repository.CartRepository;
@@ -18,100 +22,139 @@ import com.zosh.service.CouponService;
 @Service
 public class CouponServiceImpl implements CouponService {
 
-	@Autowired
-	private CouponRepository couponRepository;
-	
-	@Autowired
-	private CartRepository cartRepository;
-	
-	@Autowired
-	private UserRepository userRepository;
-	
-	
-	
-	@Override
-	public Cart applyCoupon(String code, double orderValue, User user) {
-		
-		Coupon coupon = couponRepository.findByCode(code);
-		
-		Cart cart = cartRepository.findByUserId(user.getId());
-		
-		if(coupon==null) {
-			throw new RuntimeException("Coupon not valid");
-		}
-		if(user.getUsedCoupons().contains(coupon)) {
-			throw new RuntimeException("Coupon already used");
-		}
-		
-		if(orderValue<coupon.getMinimumOrderValue()) {
-			throw new RuntimeException("valid for  minimum order value"+coupon.getMinimumOrderValue());
-		}
-		
-		if(coupon.isActive() && LocalDate.now().isAfter(coupon.getValidityStartDate()) && LocalDate.now().isBefore(coupon.getValidityEndDate())) {
-			
-			user.getUsedCoupons().add(coupon);
-			userRepository.save(user);
-			
-			double discountedPrice = (cart.getTotalSellingPrice()*coupon.getDiscountPercentage())/100;
-			
-			cart.setTotalSellingPrice(cart.getTotalSellingPrice()-discountedPrice);
-			cart.setCouponCode(code);
-			cartRepository.save(cart);
-			
-			return cart;
-		}
-		
-        throw new RuntimeException("coupon not valid...");
-	}
+    @Autowired
+    private CouponRepository couponRepository;
 
-	@Override
-	public Cart removeCoupon(String code, User user) {
-		
-		Coupon coupon = couponRepository.findByCode(code);
-		
-		if(coupon==null) {
-			throw new RuntimeException("coupon not valid..");
-		}
-		Cart cart = cartRepository.findByUserId(user.getId());
-		
-		double discountedPrice = (cart.getTotalSellingPrice()*coupon.getDiscountPercentage())/100;
-		
-		cart.setTotalSellingPrice(cart.getTotalSellingPrice()+discountedPrice);
-		
-		cart.setCouponCode(null);
-		
-		
-		
-		return cartRepository.save(cart);
-	}
+    @Autowired
+    private CartRepository cartRepository;
 
-	@Override
-	public Coupon findCouponById(Long id) {
-		
-		return couponRepository.findById(id).orElseThrow(()-> new IllegalArgumentException("Coupon not found with id..."));
-	}
+    @Autowired
+    private UserRepository userRepository;
 
-	@Override
-	@PreAuthorize("hasRole ('ADMIN')")
-	public Coupon createCoupon(Coupon coupon) {
-		
-		return couponRepository.save(coupon);
-	}
+    @Override
+    @Transactional
+    public Cart applyCoupon(String code, double orderValue, User user) {
+        Coupon coupon = couponRepository.findByCode(code.trim().toUpperCase());
 
-	@Override
-	public List<Coupon> findAllCoupons() {
-		// TODO Auto-generated method stub
-		return couponRepository.findAll();
-	}
+        if (coupon == null) {
+            throw new ResourceNotFoundException("Coupon", "code", code);
+        }
 
-	@Override
-	@PreAuthorize("hasRole ('ADMIN')")
-	public void deleteCoupon(Long id) {
-		
-		findCouponById(id);
-		
-		couponRepository.deleteById(id);
-		
-	}
+        if (!coupon.isActive()) {
+            throw new IllegalArgumentException("Coupon '" + code + "' is no longer active.");
+        }
 
+        LocalDate today = LocalDate.now();
+        if (today.isBefore(coupon.getValidityStartDate()) || today.isAfter(coupon.getValidityEndDate())) {
+            throw new IllegalArgumentException("Coupon '" + code + "' has expired or is not yet valid.");
+        }
+
+        User managedUser = userRepository.findById(user.getId())
+                .orElse(user);
+
+        if (managedUser.getUsedCoupons() != null && managedUser.getUsedCoupons().contains(coupon)) {
+            throw new IllegalArgumentException("You have already used coupon '" + code + "'.");
+        }
+
+        Cart cart = cartRepository.findByUserId(user.getId());
+        if (cart == null || cart.getCartItems().isEmpty()) {
+            throw new IllegalArgumentException("Your cart is empty.");
+        }
+
+        // Recalculate original subtotal from cart items
+        double originalTotal = cart.getCartItems().stream()
+                .mapToDouble(item -> (double) item.getSellingPrice())
+                .sum();
+
+        if (originalTotal < coupon.getMinimumOrderValue()) {
+            throw new IllegalArgumentException("Minimum order value of ₹" + coupon.getMinimumOrderValue()
+                    + " is required to apply coupon '" + code + "'. Current total: ₹" + originalTotal);
+        }
+
+        double discountAmount = (originalTotal * coupon.getDiscountPercentage()) / 100.0;
+        double finalPrice = Math.max(0, originalTotal - discountAmount);
+
+        cart.setTotalSellingPrice(finalPrice);
+        cart.setDiscount((int) discountAmount);
+        cart.setCouponCode(coupon.getCode());
+
+        if (managedUser.getUsedCoupons() != null) {
+            managedUser.getUsedCoupons().add(coupon);
+            userRepository.save(managedUser);
+        }
+
+        return cartRepository.save(cart);
+    }
+
+    @Override
+    @Transactional
+    public Cart removeCoupon(String code, User user) {
+        Coupon coupon = couponRepository.findByCode(code.trim().toUpperCase());
+        if (coupon == null) {
+            throw new ResourceNotFoundException("Coupon", "code", code);
+        }
+
+        Cart cart = cartRepository.findByUserId(user.getId());
+        if (cart == null) {
+            throw new ResourceNotFoundException("Cart for user", "userId", user.getId());
+        }
+
+        // Restore original total from cart items
+        double originalTotal = cart.getCartItems().stream()
+                .mapToDouble(item -> (double) item.getSellingPrice())
+                .sum();
+
+        cart.setTotalSellingPrice(originalTotal);
+        cart.setDiscount(0);
+        cart.setCouponCode(null);
+
+        User managedUser = userRepository.findById(user.getId())
+                .orElse(user);
+        if (managedUser.getUsedCoupons() != null) {
+            managedUser.getUsedCoupons().remove(coupon);
+            userRepository.save(managedUser);
+        }
+
+        return cartRepository.save(cart);
+    }
+
+    @Override
+    public Coupon findCouponById(Long id) {
+        return couponRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Coupon", "id", id));
+    }
+
+    @Override
+    @Transactional
+    @PreAuthorize("hasRole('ADMIN')")
+    public Coupon createCoupon(Coupon coupon) {
+        if (couponRepository.findByCode(coupon.getCode().trim().toUpperCase()) != null) {
+            throw new DuplicateResourceException("Coupon code '" + coupon.getCode() + "' already exists.");
+        }
+        coupon.setCode(coupon.getCode().trim().toUpperCase());
+        return couponRepository.save(coupon);
+    }
+
+    @Override
+    public List<Coupon> findAllCoupons() {
+        return couponRepository.findAll();
+    }
+
+    @Override
+    public List<Coupon> findActiveCoupons() {
+        LocalDate today = LocalDate.now();
+        return couponRepository.findAll().stream()
+                .filter(c -> c.isActive()
+                        && (c.getValidityStartDate() == null || !today.isBefore(c.getValidityStartDate()))
+                        && (c.getValidityEndDate() == null || !today.isAfter(c.getValidityEndDate())))
+                .toList();
+    }
+
+    @Override
+    @Transactional
+    @PreAuthorize("hasRole('ADMIN')")
+    public void deleteCoupon(Long id) {
+        Coupon coupon = findCouponById(id);
+        couponRepository.delete(coupon);
+    }
 }

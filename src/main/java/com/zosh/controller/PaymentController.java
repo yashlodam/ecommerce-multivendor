@@ -12,86 +12,48 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.razorpay.RazorpayException;
 import com.zosh.exceptions.SellerException;
-import com.zosh.model.Order;
 import com.zosh.model.PaymentOrder;
-import com.zosh.model.Seller;
-import com.zosh.model.SellerReport;
 import com.zosh.model.User;
 import com.zosh.response.ApiResponse;
-import com.zosh.response.PaymentLinkResponse;
 import com.zosh.service.PaymentService;
-import com.zosh.service.SellerReportService;
-import com.zosh.service.SellerService;
-import com.zosh.service.TransactionService;
 import com.zosh.service.UserService;
+
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 
 @RestController
 @RequestMapping("/api/payment")
+@Tag(name = "Payment Verification", description = "Payment webhook callback and transaction verification endpoints")
 public class PaymentController {
 
-	@Autowired
-	private PaymentService paymentService;
-	
-	@Autowired
-	private UserService service;
-	
-	@Autowired
-	private SellerService sellerService;
-	
-	@Autowired
-	private SellerReportService reportService;
-	
-	@Autowired
-	private TransactionService transactionService;
-	
-	
-	@GetMapping("/{paymentId}")
-	public ResponseEntity<ApiResponse> paymentSucessHandler(
-			
-			@PathVariable String paymentId,
-			@RequestParam String paymentLinkId,
-			@RequestHeader("Authorization") String jwt
-			
-			) throws RazorpayException, SellerException
-	{
-		
-		User user = service.findUserByJwtToken(jwt);
-		
-		PaymentLinkResponse paymentLinkResponse;
-		
-		PaymentOrder paymentOrder = paymentService.getPaymentOrderByPaymentId(paymentId);
-		
-		boolean paymentSucess = paymentService.ProceedPaymentOrder(paymentOrder, paymentId, paymentLinkId);
-		
-		
-		if(paymentSucess) {
-			
-			
-			for(Order order:paymentOrder.getOrders()) {
-				
-				transactionService.createTransaction(order);
-				
-				Seller seller = sellerService.getSellerById(order.getSellerId());
-				
-				SellerReport report = reportService.getSellerReport(seller);
-				report.setTotalOrders(report.getTotalOrders()+1);
-				report.setTotalEarnings(report.getTotalEarnings()+order.getTotalSellingPrice());
-				report.setTotalSales(report.getTotalSales()+order.getOrderItems().size());
-				reportService.updateSellerReport(report);
-				
-				
-				
-			}
-			
-			
-		}
-		
-		ApiResponse res = new ApiResponse();
-		res.setMessage("Payment sucessfull");
-		
-		return new ResponseEntity<>(res,HttpStatus.CREATED);
-		
-		
-	}
-	
+    @Autowired
+    private PaymentService paymentService;
+
+    @Autowired
+    private UserService userService;
+
+    @GetMapping("/{paymentId}")
+    @Operation(summary = "Verify online payment completion with payment gateway (Razorpay)")
+    public ResponseEntity<ApiResponse> paymentSuccessHandler(
+            @PathVariable String paymentId,
+            @RequestParam String paymentLinkId,
+            @RequestHeader("Authorization") String jwt) throws RazorpayException, SellerException {
+
+        User user = userService.findUserByJwtToken(jwt);
+
+        PaymentOrder paymentOrder = paymentService.getPaymentOrderByPaymentId(paymentLinkId);
+
+        boolean paymentSuccess = paymentService.ProceedPaymentOrder(
+                paymentOrder,
+                paymentId,
+                paymentLinkId);
+
+        if (paymentSuccess) {
+            ApiResponse res = new ApiResponse("Payment successful and orders confirmed");
+            return ResponseEntity.ok(res);
+        }
+
+        ApiResponse res = new ApiResponse("Payment verification failed");
+        return new ResponseEntity<>(res, HttpStatus.BAD_REQUEST);
+    }
 }

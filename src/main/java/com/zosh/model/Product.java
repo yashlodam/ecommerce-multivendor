@@ -4,182 +4,232 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonManagedReference;
+
 import jakarta.persistence.CascadeType;
+import jakarta.persistence.Column;
 import jakarta.persistence.ElementCollection;
 import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.Index;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
+import jakarta.persistence.PrePersist;
+import jakarta.persistence.SequenceGenerator;
+import jakarta.persistence.Table;
+import jakarta.persistence.Transient;
+import jakarta.persistence.Version;
 
+
+/**
+ * Represents a product listed by a seller.
+ *
+ * Price is stored as Integer (paisa / smallest currency unit) to avoid
+ * floating-point precision issues with money.
+ *
+ * The @Version field enables optimistic locking — if two transactions try to
+ * update the same product concurrently (e.g., two buyers checking out the last
+ * item), one will succeed and the other will receive an OptimisticLockException,
+ * preventing overselling.
+ */
 @Entity
+@Table(
+    name = "products",
+    indexes = {
+        @Index(name = "idx_product_seller",   columnList = "seller_id"),
+        @Index(name = "idx_product_category", columnList = "category_id"),
+        @Index(name = "idx_product_created",  columnList = "created_at")
+    }
+)
+@JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
 public class Product {
 
-	@Id
-	@GeneratedValue(strategy = GenerationType.AUTO)
-	private Long id;
-	
-	private String title;
-	
-	private String description;
-	
-	private int mrpPrice;
-	
-	private int sellingPrice;
-	
-	private int discountPercent;
-	
-	
-	private int quantity;
-	
-	private String color;
-	
-	
-	@ElementCollection
-	private List<String> images = new ArrayList<>();
-	
-	private int numRatings;
-	
-	@ManyToOne
-	private Category category;
-	
-	
-	@ManyToOne
-	private Seller seller;
-	
-	private LocalDateTime createdAt;
-	
-	
-	private String Sizes;
-	
-	@OneToMany(mappedBy = "product", cascade = CascadeType.ALL , orphanRemoval = true)
-	private List<Review> reviews = new ArrayList<>();
+    @Id
+    @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "product_seq")
+    @SequenceGenerator(name = "product_seq", sequenceName = "product_sequence", allocationSize = 1)
+    private Long id;
 
-	public Long getId() {
-		return id;
-	}
+    @Column(nullable = false)
+    private String title;
 
-	public void setId(Long id) {
-		this.id = id;
-	}
+    @Column(columnDefinition = "TEXT")
+    private String description;
 
-	public String getTitle() {
-		return title;
-	}
+    /** Price stored as Integer in smallest currency unit (e.g. paisa for INR) */
+    @Column(nullable = false)
+    private Integer mrpPrice;
 
-	public void setTitle(String title) {
-		this.title = title;
-	}
+    @Column(nullable = false)
+    private Integer sellingPrice;
 
-	public String getDescription() {
-		return description;
-	}
+    private Integer discountPercent;
 
-	public void setDescription(String description) {
-		this.description = description;
-	}
+    /** Available stock quantity — protected by optimistic locking via @Version */
+    @Column(nullable = false)
+    private Integer quantity = 0;
 
-	public int getMrpPrice() {
-		return mrpPrice;
-	}
+    private String color;
 
-	public void setMrpPrice(int mrpPrice) {
-		this.mrpPrice = mrpPrice;
-	}
+    private String brand;
 
-	public int getSellingPrice() {
-		return sellingPrice;
-	}
+    @ElementCollection(fetch = FetchType.EAGER)
+    private List<String> images = new ArrayList<>();
 
-	public void setSellingPrice(int sellingPrice) {
-		this.sellingPrice = sellingPrice;
-	}
+    private Integer numRatings = 0;
 
-	public int getDiscountPercent() {
-		return discountPercent;
-	}
+    @ManyToOne
+    private Category category;
 
-	public void setDiscountPercent(int discountPercent) {
-		this.discountPercent = discountPercent;
-	}
+    @ManyToOne(optional = false)
+    private Seller seller;
 
-	public int getQuantity() {
-		return quantity;
-	}
+    @Column(name = "created_at", nullable = false, updatable = false)
+    private LocalDateTime createdAt;
 
-	public void setQuantity(int quantity) {
-		this.quantity = quantity;
-	}
+    private String sizes;
 
-	public String getColor() {
-		return color;
-	}
+    /**
+     * Optimistic lock version — Hibernate increments this on every UPDATE.
+     * Prevents two concurrent transactions from both deducting the last item.
+     */
+    @Version
+    private Long version;
 
-	public void setColor(String color) {
-		this.color = color;
-	}
+    @JsonIgnore
+    @OneToMany(mappedBy = "product", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<Review> reviews = new ArrayList<>();
 
-	public List<String> getImages() {
-		return images;
-	}
+    /**
+     * All purchasable variants of this product (sizes, storage options, etc.).
+     * Products with no real variants have exactly one isDefault=true variant.
+     * Lazily loaded to avoid N+1 on catalog queries.
+     */
+    @OneToMany(mappedBy = "product", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
+    private List<ProductVariant> variants = new ArrayList<>();
 
-	public void setImages(List<String> images) {
-		this.images = images;
-	}
+    @Transient
+    private Boolean dealActive = false;
 
-	public int getNumRatings() {
-		return numRatings;
-	}
+    @Transient
+    private Integer effectivePrice;
 
-	public void setNumRatings(int numRatings) {
-		this.numRatings = numRatings;
-	}
+    @Transient
+    private Integer discountAmount = 0;
 
-	public Category getCategory() {
-		return category;
-	}
+    @Transient
+    private String appliedDealTitle;
 
-	public void setCategory(Category category) {
-		this.category = category;
-	}
+    @Transient
+    private LocalDateTime dealEndsAt;
 
-	public Seller getSeller() {
-		return seller;
-	}
+    @PrePersist
 
-	public void setSeller(Seller seller) {
-		this.seller = seller;
-	}
+    protected void onCreate() {
+        if (createdAt == null) {
+            createdAt = LocalDateTime.now();
+        }
+    }
 
-	public LocalDateTime getCreatedAt() {
-		return createdAt;
-	}
+    // ---- Getters and Setters ----
 
-	public void setCreatedAt(LocalDateTime createdAt) {
-		this.createdAt = createdAt;
-	}
+    public Long getId() { return id; }
+    public void setId(Long id) { this.id = id; }
 
-	public String getSizes() {
-		return Sizes;
-	}
+    public String getTitle() { return title; }
+    public void setTitle(String title) { this.title = title; }
 
-	public void setSizes(String sizes) {
-		Sizes = sizes;
-	}
+    public String getDescription() { return description; }
+    public void setDescription(String description) { this.description = description; }
 
-	public List<Review> getReviews() {
-		return reviews;
-	}
+    public Integer getMrpPrice() { return mrpPrice; }
+    public void setMrpPrice(Integer mrpPrice) { this.mrpPrice = mrpPrice; }
 
-	public void setReviews(List<Review> reviews) {
-		this.reviews = reviews;
-	}
-	
-	
-	
-	
-	
-	
-	
+    public Integer getSellingPrice() { return sellingPrice; }
+    public void setSellingPrice(Integer sellingPrice) { this.sellingPrice = sellingPrice; }
+
+    public Integer getDiscountPercent() { return discountPercent; }
+    public void setDiscountPercent(Integer discountPercent) { this.discountPercent = discountPercent; }
+
+    public Integer getQuantity() { return quantity; }
+    public void setQuantity(Integer quantity) { this.quantity = quantity; }
+
+    public String getColor() { return color; }
+    public void setColor(String color) { this.color = color; }
+
+    public String getBrand() { return brand; }
+    public void setBrand(String brand) { this.brand = brand; }
+
+    public List<String> getImages() { return images; }
+    public void setImages(List<String> images) { this.images = images; }
+
+    public Integer getNumRatings() { return numRatings; }
+    public void setNumRatings(Integer numRatings) { this.numRatings = numRatings; }
+
+    public Category getCategory() { return category; }
+    public void setCategory(Category category) { this.category = category; }
+
+    public Seller getSeller() { return seller; }
+    public void setSeller(Seller seller) { this.seller = seller; }
+
+    public LocalDateTime getCreatedAt() { return createdAt; }
+    public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
+
+    public String getSizes() { return sizes; }
+    public void setSizes(String sizes) { this.sizes = sizes; }
+
+    public Long getVersion() { return version; }
+
+    public List<Review> getReviews() { return reviews; }
+    public void setReviews(List<Review> reviews) { this.reviews = reviews; }
+
+    public List<ProductVariant> getVariants() { return variants; }
+    public void setVariants(List<ProductVariant> variants) { this.variants = variants; }
+
+    /**
+     * Returns the total available stock across all variants.
+     * Falls back to the flat {@code quantity} field if no variants exist yet
+     * (backward compatibility with pre-migration products).
+     */
+    public int getTotalStock() {
+        if (variants == null || variants.isEmpty()) {
+            return quantity != null ? quantity : 0;
+        }
+        return variants.stream()
+                       .mapToInt(v -> v.getQuantity() != null ? v.getQuantity() : 0)
+                       .sum();
+    }
+
+    public Boolean getDealActive() { return dealActive; }
+    public void setDealActive(Boolean dealActive) { this.dealActive = dealActive; }
+
+    public Integer getEffectivePrice() { return effectivePrice != null ? effectivePrice : sellingPrice; }
+    public void setEffectivePrice(Integer effectivePrice) { this.effectivePrice = effectivePrice; }
+
+    public Integer getDiscountAmount() { return discountAmount; }
+    public void setDiscountAmount(Integer discountAmount) { this.discountAmount = discountAmount; }
+
+    public String getAppliedDealTitle() { return appliedDealTitle; }
+    public void setAppliedDealTitle(String appliedDealTitle) { this.appliedDealTitle = appliedDealTitle; }
+
+    public LocalDateTime getDealEndsAt() { return dealEndsAt; }
+    public void setDealEndsAt(LocalDateTime dealEndsAt) { this.dealEndsAt = dealEndsAt; }
+
+    @Override
+    public boolean equals(Object o) {
+
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        Product product = (Product) o;
+        return id != null && id.equals(product.id);
+    }
+
+    @Override
+    public int hashCode() {
+        return getClass().hashCode();
+    }
 }

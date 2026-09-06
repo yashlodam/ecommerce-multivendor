@@ -20,4 +20,6 @@ public interface UserService {
 	 User unbanUser(Long id);
 
 	 void deleteUser(Long id);
+
+	 void deleteCustomerAccount(User user);
 }

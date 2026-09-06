@@ -1,9 +1,11 @@
 package com.zosh.service.impl;
 
 import java.util.List;
+import java.util.Optional;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import com.zosh.model.Order;
 import com.zosh.model.Seller;
@@ -23,19 +25,25 @@ public class TransactionServiceImpl implements TransactionService{
 	
 	
 	@Override
+	@Transactional
 	public Transaction createTransaction(Order order) {
-	    
-		Seller seller = sellerRepository.findById(order.getSellerId()).get();
-		
-		Transaction transaction = new Transaction();
-		transaction.setSeller(seller);
-		transaction.setCustomer(order.getUser());
-		transaction.setOrder(order);
-		
-		
-		
-		
-		return transactionRepository.save(transaction);
+
+	    Optional<Transaction> existing =
+	            transactionRepository.findByOrder(order);
+
+	    if (existing.isPresent()) {
+	        return existing.get();
+	    }
+
+	    Seller seller = sellerRepository.findById(order.getSellerId())
+	            .orElseThrow(() -> new IllegalArgumentException("Seller not found"));
+
+	    Transaction transaction = new Transaction();
+	    transaction.setSeller(seller);
+	    transaction.setCustomer(order.getUser());
+	    transaction.setOrder(order);
+
+	    return transactionRepository.save(transaction);
 	}
 
 	@Override

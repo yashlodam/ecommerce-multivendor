@@ -1,66 +1,125 @@
 package com.zosh.model;
 
+import java.time.LocalDateTime;
+
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
+import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.OneToOne;
+import jakarta.persistence.PrePersist;
+import jakarta.persistence.Table;
 
+/**
+ * Stores OTPs for email verification and login.
+ *
+ * OTPs are short-lived — the expiresAt field enforces expiry.
+ * The application property 'app.otp.expiry-minutes' controls the TTL (default: 10 minutes).
+ *
+ * OTPs must be deleted after successful use to prevent replay attacks.
+ */
 @Entity
+@Table(name = "verification_codes")
+@JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
 public class VerificationCode {
 
-	@Id
-	@GeneratedValue(strategy = GenerationType.AUTO)
-	private Long id;
-	
-	private String otp;
-	
-	private String email;
-	
-	@OneToOne
-	private User user;
-	
-	@OneToOne
-	private Seller seller;
+    @Id
+    @GeneratedValue(strategy = GenerationType.SEQUENCE)
+    private Long id;
 
-	public Long getId() {
-		return id;
-	}
+    @Column(nullable = false)
+    private String otp;
 
-	public void setId(Long id) {
-		this.id = id;
-	}
+    @Column(nullable = false)
+    private String email;
 
-	public String getOtp() {
-		return otp;
-	}
+    @Column(nullable = false)
+    private LocalDateTime createdAt = LocalDateTime.now();
 
-	public void setOtp(String otp) {
-		this.otp = otp;
-	}
+    @Column(nullable = false)
+    private LocalDateTime expiresAt;
 
-	public String getEmail() {
-		return email;
-	}
+    @JsonIgnore
+    @OneToOne
+    private User user;
 
-	public void setEmail(String email) {
-		this.email = email;
-	}
+    @JsonIgnore
+    @OneToOne
+    private Seller seller;
 
-	public User getUser() {
-		return user;
-	}
+    @PrePersist
+    protected void onCreate() {
+        if (createdAt == null) {
+            createdAt = LocalDateTime.now();
+        }
+        if (expiresAt == null) {
+            expiresAt = createdAt.plusMinutes(10);
+        }
+    }
 
-	public void setUser(User user) {
-		this.user = user;
-	}
+    public boolean isExpired() {
+        return expiresAt != null && LocalDateTime.now().isAfter(expiresAt);
+    }
 
-	public Seller getSeller() {
-		return seller;
-	}
+    // ---- Getters and Setters ----
 
-	public void setSeller(Seller seller) {
-		this.seller = seller;
-	}
-	
+    public Long getId() {
+        return id;
+    }
+
+    public void setId(Long id) {
+        this.id = id;
+    }
+
+    public String getOtp() {
+        return otp;
+    }
+
+    public void setOtp(String otp) {
+        this.otp = otp;
+    }
+
+    public String getEmail() {
+        return email;
+    }
+
+    public void setEmail(String email) {
+        this.email = email;
+    }
+
+    public LocalDateTime getCreatedAt() {
+        return createdAt;
+    }
+
+    public void setCreatedAt(LocalDateTime createdAt) {
+        this.createdAt = createdAt;
+    }
+
+    public LocalDateTime getExpiresAt() {
+        return expiresAt;
+    }
+
+    public void setExpiresAt(LocalDateTime expiresAt) {
+        this.expiresAt = expiresAt;
+    }
+
+    public User getUser() {
+        return user;
+    }
+
+    public void setUser(User user) {
+        this.user = user;
+    }
+
+    public Seller getSeller() {
+        return seller;
+    }
+
+    public void setSeller(Seller seller) {
+        this.seller = seller;
+    }
 }

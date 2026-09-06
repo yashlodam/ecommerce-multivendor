@@ -17,5 +17,7 @@ public interface CouponService {
 	
 	List<Coupon> findAllCoupons();
 	
+	List<Coupon> findActiveCoupons();
+	
 	void deleteCoupon(Long id);
 }

@@ -4,10 +4,16 @@ import java.util.List;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 
+import com.zosh.model.Order;
 import com.zosh.model.Transaction;
 
-public interface TransactionRepository extends JpaRepository<Transaction,Long> {
+import java.util.Optional;
 
-	List<Transaction> findBySellerId(Long sellerId);
-	
+public interface TransactionRepository extends JpaRepository<Transaction, Long> {
+
+    List<Transaction> findBySellerId(Long sellerId);
+
+    Optional<Transaction> findByOrder(Order order);
+
+    boolean existsByOrder(Order order);
 }

@@ -1,6 +1,8 @@
 package com.zosh.model;
 
-
+import com.fasterxml.jackson.annotation.JsonAlias;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.zosh.domain.AccountStatus;
 import com.zosh.domain.USER_ROLE;
 
@@ -8,161 +10,164 @@ import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Embedded;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
-import jakarta.persistence.OneToMany;
+import jakarta.persistence.Index;
 import jakarta.persistence.OneToOne;
+import jakarta.persistence.SequenceGenerator;
+import jakarta.persistence.Table;
 
 @Entity
+@Table(
+    name = "sellers",
+    indexes = {
+        @Index(name = "idx_seller_email", columnList = "email", unique = true),
+        @Index(name = "idx_seller_status", columnList = "accountStatus")
+    }
+)
+@JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
 public class Seller {
 
-	@Id
-	@GeneratedValue(strategy = GenerationType.AUTO)
-	private Long id;
-	
-	private String sellerName;
-	
-	
-	private String mobile;
-	
-	@Column(unique = true,nullable = false)
-	private String email;
-	
-	private String password;
-	
-	@Embedded
-	private BusinessDetails businesssDetails = new BusinessDetails();
-	
-	@Embedded
-	private BankDetails bankDetails = new BankDetails();
-	
-	
-	@OneToOne(cascade =  CascadeType.ALL)
-	private Address pickupAddress = new Address();
-	
-	private String GSTIN;
-	
-	private USER_ROLE role = USER_ROLE.ROLE_SELLER;
-	
-	
-	private boolean isEmailVerified = false;
-	
-	private AccountStatus accountStatus = AccountStatus.PENDING_VERIFICATION;
+    @Id
+    @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "seller_seq")
+    @SequenceGenerator(name = "seller_seq", sequenceName = "seller_sequence", allocationSize = 1)
+    private Long id;
 
-	public Long getId() {
-		return id;
-	}
+    private String sellerName;
 
-	public void setId(Long id) {
-		this.id = id;
-	}
+    private String mobile;
 
-	public String getSellerName() {
-		return sellerName;
-	}
+    @Column(unique = true, nullable = false)
+    private String email;
 
-	public void setSellerName(String sellerName) {
-		this.sellerName = sellerName;
-	}
+    @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
+    private String password;
 
-	public String getMobile() {
-		return mobile;
-	}
+    @Embedded
+    private BusinessDetails businesssDetails = new BusinessDetails();
 
-	public void setMobile(String mobile) {
-		this.mobile = mobile;
-	}
+    @Embedded
+    private BankDetails bankDetails = new BankDetails();
 
-	public String getEmail() {
-		return email;
-	}
+    @OneToOne(cascade = CascadeType.ALL, orphanRemoval = true)
+    private Address pickupAddress;
 
-	public void setEmail(String email) {
-		this.email = email;
-	}
+    @JsonProperty("gstin")
+    @JsonAlias({"GSTIN", "gstin", "gstinNumber", "gst_number", "gstNumber", "gSTIN"})
+    private String GSTIN;
 
-	public String getPassword() {
-		return password;
-	}
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private USER_ROLE role = USER_ROLE.ROLE_SELLER;
 
-	public void setPassword(String password) {
-		this.password = password;
-	}
+    private boolean isEmailVerified = false;
 
-	public BusinessDetails getBusinesssDetails() {
-		return businesssDetails;
-	}
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private AccountStatus accountStatus = AccountStatus.PENDING_VERIFICATION;
 
-	public void setBusinesssDetails(BusinessDetails businesssDetails) {
-		this.businesssDetails = businesssDetails;
-	}
+    public Seller() {
+    }
 
-	public BankDetails getBankDetails() {
-		return bankDetails;
-	}
+    public Long getId() {
+        return id;
+    }
 
-	public void setBankDetails(BankDetails bankDetails) {
-		this.bankDetails = bankDetails;
-	}
+    public void setId(Long id) {
+        this.id = id;
+    }
 
-	public Address getPickupAddress() {
-		return pickupAddress;
-	}
+    public String getSellerName() {
+        return sellerName;
+    }
 
-	public void setPickupAddress(Address pickupAddress) {
-		this.pickupAddress = pickupAddress;
-	}
+    public void setSellerName(String sellerName) {
+        this.sellerName = sellerName;
+    }
 
-	public String getGSTIN() {
-		return GSTIN;
-	}
+    public String getMobile() {
+        return mobile;
+    }
 
-	public void setGSTIN(String gSTIN) {
-		GSTIN = gSTIN;
-	}
+    public void setMobile(String mobile) {
+        this.mobile = mobile;
+    }
 
-	public USER_ROLE getRole() {
-		return role;
-	}
+    public String getEmail() {
+        return email;
+    }
 
-	public void setRole(USER_ROLE role) {
-		this.role = role;
-	}
+    public void setEmail(String email) {
+        this.email = email;
+    }
 
-	public boolean isEmailVerified() {
-		return isEmailVerified;
-	}
+    public String getPassword() {
+        return password;
+    }
 
-	public void setEmailVerified(boolean isEmailVerified) {
-		this.isEmailVerified = isEmailVerified;
-	}
+    public void setPassword(String password) {
+        this.password = password;
+    }
 
-	public AccountStatus getAccountStatus() {
-		return accountStatus;
-	}
+    public BusinessDetails getBusinesssDetails() {
+        return businesssDetails;
+    }
 
-	public void setAccountStatus(AccountStatus accountStatus) {
-		this.accountStatus = accountStatus;
-	}
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
+    public void setBusinesssDetails(BusinessDetails businesssDetails) {
+        this.businesssDetails = businesssDetails;
+    }
+
+    public BankDetails getBankDetails() {
+        return bankDetails;
+    }
+
+    public void setBankDetails(BankDetails bankDetails) {
+        this.bankDetails = bankDetails;
+    }
+
+    public Address getPickupAddress() {
+        return pickupAddress;
+    }
+
+    public void setPickupAddress(Address pickupAddress) {
+        this.pickupAddress = pickupAddress;
+    }
+
+    @JsonProperty("gstin")
+    public String getGSTIN() {
+        return GSTIN;
+    }
+
+    @JsonProperty("gstin")
+    @JsonAlias({"GSTIN", "gstin", "gstinNumber", "gst_number", "gstNumber", "gSTIN"})
+    public void setGSTIN(String gSTIN) {
+        GSTIN = gSTIN;
+    }
+
+    public USER_ROLE getRole() {
+        return role;
+    }
+
+    public void setRole(USER_ROLE role) {
+        this.role = role;
+    }
+
+    public boolean isEmailVerified() {
+        return isEmailVerified;
+    }
+
+    public void setEmailVerified(boolean isEmailVerified) {
+        this.isEmailVerified = isEmailVerified;
+    }
+
+    public AccountStatus getAccountStatus() {
+        return accountStatus;
+    }
+
+    public void setAccountStatus(AccountStatus accountStatus) {
+        this.accountStatus = accountStatus;
+    }
 }

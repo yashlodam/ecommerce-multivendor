@@ -2,100 +2,143 @@ package com.zosh.model;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.Index;
 import jakarta.persistence.ManyToOne;
+import jakarta.persistence.SequenceGenerator;
+import jakarta.persistence.Table;
 
 @Entity
+@Table(
+    name = "cart_items",
+    indexes = {
+        @Index(name = "idx_cart_item_cart_id", columnList = "cart_id"),
+        @Index(name = "idx_cart_item_product_id", columnList = "product_id"),
+        @Index(name = "idx_cart_item_user_id", columnList = "userId")
+    }
+)
+@JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
 public class CartItem {
 
-	@Id
-	@GeneratedValue(strategy = GenerationType.AUTO)
-	private Long id;
-	
-	
-	@ManyToOne
-	@JsonIgnore
-	private Cart cart;
-	
-	@ManyToOne
-	private Product product;
-	
-	private String size;;
-	
-	private int quantity= 1;
-	
-	private Integer mrpPrice;
-	
-	private Integer sellingPrice;
-	
-	private Long userId;
+    @Id
+    @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "cart_item_seq")
+    @SequenceGenerator(name = "cart_item_seq", sequenceName = "cart_item_sequence", allocationSize = 1)
+    private Long id;
 
-	public Long getId() {
-		return id;
-	}
+    @ManyToOne(optional = false)
+    @JsonIgnore
+    private Cart cart;
 
-	public void setId(Long id) {
-		this.id = id;
-	}
+    @ManyToOne(optional = false)
+    private Product product;
 
-	public Cart getCart() {
-		return cart;
-	}
+    /**
+     * The specific variant selected by the customer (nullable for backward compat).
+     * When present, pricing comes from the variant, not from product-level prices.
+     */
+    @ManyToOne(optional = true)
+    private ProductVariant variant;
 
-	public void setCart(Cart cart) {
-		this.cart = cart;
-	}
+    private String size;
 
-	public Product getProduct() {
-		return product;
-	}
+    private int quantity = 1;
 
-	public void setProduct(Product product) {
-		this.product = product;
-	}
+    private Integer mrpPrice;
 
-	public String getSize() {
-		return size;
-	}
+    private Integer sellingPrice;
 
-	public void setSize(String size) {
-		this.size = size;
-	}
+    private Long userId;
 
-	public int getQuantity() {
-		return quantity;
-	}
+    public CartItem() {
+    }
 
-	public void setQuantity(int quantity) {
-		this.quantity = quantity;
-	}
+    public Long getId() {
+        return id;
+    }
 
-	public Integer getMrpPrice() {
-		return mrpPrice;
-	}
+    public void setId(Long id) {
+        this.id = id;
+    }
 
-	public void setMrpPrice(Integer mrpPrice) {
-		this.mrpPrice = mrpPrice;
-	}
+    public Cart getCart() {
+        return cart;
+    }
 
-	public Integer getSellingPrice() {
-		return sellingPrice;
-	}
+    public void setCart(Cart cart) {
+        this.cart = cart;
+    }
 
-	public void setSellingPrice(Integer sellingPrice) {
-		this.sellingPrice = sellingPrice;
-	}
+    public Product getProduct() {
+        return product;
+    }
 
-	public Long getUserId() {
-		return userId;
-	}
+    public void setProduct(Product product) {
+        this.product = product;
+    }
 
-	public void setUserId(Long userId) {
-		this.userId = userId;
-	}
-	
-	
+    public ProductVariant getVariant() {
+        return variant;
+    }
+
+    public void setVariant(ProductVariant variant) {
+        this.variant = variant;
+    }
+
+    public String getSize() {
+        return size;
+    }
+
+    public void setSize(String size) {
+        this.size = size;
+    }
+
+    public int getQuantity() {
+        return quantity;
+    }
+
+    public void setQuantity(int quantity) {
+        this.quantity = quantity;
+    }
+
+    public Integer getMrpPrice() {
+        return mrpPrice;
+    }
+
+    public void setMrpPrice(Integer mrpPrice) {
+        this.mrpPrice = mrpPrice;
+    }
+
+    public Integer getSellingPrice() {
+        return sellingPrice;
+    }
+
+    public void setSellingPrice(Integer sellingPrice) {
+        this.sellingPrice = sellingPrice;
+    }
+
+    public Long getUserId() {
+        return userId;
+    }
+
+    public void setUserId(Long userId) {
+        this.userId = userId;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        CartItem cartItem = (CartItem) o;
+        return id != null && id.equals(cartItem.id);
+    }
+
+    @Override
+    public int hashCode() {
+        return getClass().hashCode();
+    }
 }

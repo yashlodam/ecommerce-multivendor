@@ -24,13 +24,30 @@ public class HomeCategoryServiceImpl implements HomeCategoryService{
 
 	@Override
 	public List<HomeCategory> createCategories(List<HomeCategory> homeCategories) {
-		
-		if(homecategoryRepository.findAll().isEmpty()) {
-			
+		if (homeCategories == null || homeCategories.isEmpty()) {
+			return homecategoryRepository.findAll();
+		}
+
+		List<HomeCategory> existing = homecategoryRepository.findAll();
+		if (existing.isEmpty()) {
 			return homecategoryRepository.saveAll(homeCategories);
 		}
-		
-		return homecategoryRepository.findAll();
+
+		java.util.Set<String> existingCategoryIds = existing.stream()
+				.map(HomeCategory::getCategoryId)
+				.filter(java.util.Objects::nonNull)
+				.collect(java.util.stream.Collectors.toSet());
+
+		List<HomeCategory> toSave = homeCategories.stream()
+				.filter(c -> c.getCategoryId() != null && !existingCategoryIds.contains(c.getCategoryId()))
+				.collect(java.util.stream.Collectors.toList());
+
+		if (!toSave.isEmpty()) {
+			homecategoryRepository.saveAll(toSave);
+			return homecategoryRepository.findAll();
+		}
+
+		return existing;
 	}
 
 	@Override
@@ -40,12 +57,20 @@ public class HomeCategoryServiceImpl implements HomeCategoryService{
 				.orElseThrow(()-> new IllegalArgumentException("Category not found"));
 		
 		
-		if(homeCategory.getImage()!=null) {
-			existing.setImage(homeCategory.getImage());;
+		if(homeCategory.getName()!=null) {
+			existing.setName(homeCategory.getName());
 		}
-		
+		if(homeCategory.getImage()!=null) {
+			existing.setImage(homeCategory.getImage());
+		}
 		if(homeCategory.getCategoryId()!=null) {
 			existing.setCategoryId(homeCategory.getCategoryId());
+		}
+		if(homeCategory.getSection()!=null) {
+			existing.setSection(homeCategory.getSection());
+		}
+		if(homeCategory.getPriority()!=null) {
+			existing.setPriority(homeCategory.getPriority());
 		}
 		
 		return homecategoryRepository.save(existing);

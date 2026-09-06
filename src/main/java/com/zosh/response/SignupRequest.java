@@ -1,34 +1,45 @@
 package com.zosh.response;
 
+import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.Size;
+
 public class SignupRequest {
 
-	private String email;
-	
-	private String fullName;
-	
-	private String otp;
+    @NotBlank(message = "Email is required")
+    @Email(message = "Email must be valid")
+    private String email;
 
-	public String getEmail() {
-		return email;
-	}
+    @NotBlank(message = "Full name is required")
+    @Size(min = 2, max = 100, message = "Full name must be between 2 and 100 characters")
+    private String fullName;
 
-	public void setEmail(String email) {
-		this.email = email;
-	}
+    @NotBlank(message = "OTP is required")
+    @Pattern(regexp = "^[0-9]{6}$", message = "OTP must be exactly 6 digits")
+    private String otp;
 
-	public String getFullName() {
-		return fullName;
-	}
+    public String getEmail() {
+        return email;
+    }
 
-	public void setFullName(String fullName) {
-		this.fullName = fullName;
-	}
+    public void setEmail(String email) {
+        this.email = email;
+    }
 
-	public String getOtp() {
-		return otp;
-	}
+    public String getFullName() {
+        return fullName;
+    }
 
-	public void setOtp(String otp) {
-		this.otp = otp;
-	}
+    public void setFullName(String fullName) {
+        this.fullName = fullName;
+    }
+
+    public String getOtp() {
+        return otp;
+    }
+
+    public void setOtp(String otp) {
+        this.otp = otp;
+    }
 }

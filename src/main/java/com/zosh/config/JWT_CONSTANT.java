@@ -1,8 +1,16 @@
 package com.zosh.config;
 
-public class JWT_CONSTANT {
+/**
+ * JWT constants — header name only.
+ * The secret key is injected via @Value in JwtProvider and JwtTokenValidator
+ * from the application property 'app.jwt.secret' which is sourced from
+ * the JWT_SECRET_KEY environment variable.
+ *
+ * DO NOT put a real secret key in this class.
+ */
+public final class JWT_CONSTANT {
 
-	public static final String SECRET_KEY = "skskskkfkffbbdhfhdfdjfsdjfofjkjojodkfshfskfhsdioofwojfdsdsjjbfosdf";
-			
-	public static final String JWT_HEADER = "Authorization";
+    private JWT_CONSTANT() {}
+
+    public static final String JWT_HEADER = "Authorization";
 }

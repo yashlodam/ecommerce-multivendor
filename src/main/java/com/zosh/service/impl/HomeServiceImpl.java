@@ -4,6 +4,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -16,6 +18,8 @@ import com.zosh.response.HomeService;
 
 @Service
 public class HomeServiceImpl implements HomeService {
+
+	private static final Logger log = LoggerFactory.getLogger(HomeServiceImpl.class);
 	
 	@Autowired
 	private DealRepository dealRepository;
@@ -48,6 +52,10 @@ public class HomeServiceImpl implements HomeService {
 	    			.collect(Collectors.toList());
 	    	
 	    	createdDeals = dealRepository.saveAll(deals);
+	    	for (Deal deal : createdDeals) {
+	    	    log.debug("Created Deal ID = {}, Category = {}", deal.getId(),
+	    	            deal.getCategory() != null ? deal.getCategory().getCategoryId() : "NULL");
+	    	}
 	    	
 	    } else createdDeals = dealRepository.findAll();
 	    

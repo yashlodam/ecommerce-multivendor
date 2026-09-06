@@ -1,9 +1,13 @@
 package com.zosh.service.impl;
 
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
@@ -14,9 +18,13 @@ import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import com.zosh.config.JwtProvider;
 import com.zosh.domain.USER_ROLE;
+import com.zosh.exceptions.DuplicateResourceException;
+import com.zosh.exceptions.OtpExpiredException;
+import com.zosh.exceptions.ResourceNotFoundException;
 import com.zosh.model.Cart;
 import com.zosh.model.Seller;
 import com.zosh.model.User;
@@ -34,218 +42,196 @@ import com.zosh.utils.OtpUtil;
 
 @Service
 public class AuthServiceImpl implements AuthService {
-	
-	@Autowired
-	private UserRepository userepo;
-	
-	@Autowired
-	private CartRepository cartrepo;
-	
-	@Autowired
-	private PasswordEncoder passwordEncoder;
-	
-	@Autowired
-	private JwtProvider jwtprovider;
-	
-	@Autowired
-	private VerificationCodeRepository repo;
-	
-	@Autowired
-	private EmailService emailService;
-	
-	@Autowired
-	private SellerRepository sellerepo;
-	
-	@Autowired
-	private CustomeUserServiceImpl customeUserServiceImpl;
 
-	@Override
-	public String createUser(SignupRequest req) {
+    private static final Logger log = LoggerFactory.getLogger(AuthServiceImpl.class);
+    private static final String SELLER_PREFIX = "seller_";
 
-	    VerificationCode verificationCode =
-	            repo.findByEmail(req.getEmail());
+    @Autowired private UserRepository userRepo;
+    @Autowired private CartRepository cartRepo;
+    @Autowired private PasswordEncoder passwordEncoder;
+    @Autowired private JwtProvider jwtProvider;
+    @Autowired private VerificationCodeRepository verificationCodeRepo;
+    @Autowired private EmailService emailService;
+    @Autowired private SellerRepository sellerRepo;
+    @Autowired private CustomeUserServiceImpl customUserService;
 
-	    if (verificationCode == null) {
-	        throw new IllegalArgumentException(
-	                "OTP not found for email: " + req.getEmail());
-	    }
+    @Value("${app.otp.expiry-minutes:10}")
+    private int otpExpiryMinutes;
 
-	    if (!verificationCode.getOtp().equals(req.getOtp())) {
-	        throw new IllegalArgumentException("Invalid OTP");
-	    }
+    /**
+     * Registers a new customer after OTP verification.
+     * Creates the user and an empty cart in a single transaction.
+     */
+    @Override
+    @Transactional
+    public String createUser(SignupRequest req) {
 
-	    if (userepo.existsByEmail(req.getEmail())) {
-	        throw new RuntimeException("Email already exists");
-	    }
+        VerificationCode verificationCode = verificationCodeRepo.findByEmail(req.getEmail());
 
-	    User user = new User();
+        if (verificationCode == null) {
+            throw new BadCredentialsException("No OTP found for email: " + req.getEmail()
+                    + ". Please request an OTP first.");
+        }
 
-	    user.setEmail(req.getEmail());
-	    user.setFullName(req.getFullName());
-	    user.setRole(USER_ROLE.ROLE_CUSTOMER);
-	    user.setMobile("9665774924");
+        if (verificationCode.isExpired()) {
+            verificationCodeRepo.delete(verificationCode);
+            throw new OtpExpiredException(req.getEmail());
+        }
 
-	    // IMPORTANT: use password, not OTP
-	    user.setPassword(
-	            passwordEncoder.encode(passwordEncoder.encode(req.getOtp())));
+        if (!verificationCode.getOtp().equals(req.getOtp())) {
+            throw new BadCredentialsException("Invalid OTP.");
+        }
 
-	    User savedUser = userepo.save(user);
+        if (userRepo.existsByEmail(req.getEmail())) {
+            throw new DuplicateResourceException("An account with email '" + req.getEmail() + "' already exists.");
+        }
 
-	    Cart cart = new Cart();
-	    cart.setUser(savedUser);
-	    cartrepo.save(cart);
+        User user = new User();
+        user.setEmail(req.getEmail());
+        user.setFullName(req.getFullName());
+        user.setRole(USER_ROLE.ROLE_CUSTOMER);
+        // FIX: encode OTP once (not twice), used as a one-time password; user can update via profile
+        user.setPassword(passwordEncoder.encode(req.getOtp()));
 
-	    // Delete OTP after successful verification
-	    repo.delete(verificationCode);
+        User savedUser = userRepo.save(user);
 
-	    List<GrantedAuthority> authorities =
-	            new ArrayList<>();
+        // Every customer gets an empty cart
+        Cart cart = new Cart();
+        cart.setUser(savedUser);
+        cartRepo.save(cart);
 
-	    authorities.add(
-	            new SimpleGrantedAuthority(
-	                    USER_ROLE.ROLE_CUSTOMER.name()));
+        // Clean up OTP after successful use to prevent replay
+        verificationCodeRepo.delete(verificationCode);
 
-	    Authentication authentication =
-	            new UsernamePasswordAuthenticationToken(
-	                    savedUser.getEmail(),
-	                    null,
-	                    authorities);
+        log.info("New customer registered: {}", savedUser.getEmail());
 
-	    SecurityContextHolder.getContext()
-	            .setAuthentication(authentication);
+        List<GrantedAuthority> authorities = List.of(
+                new SimpleGrantedAuthority(USER_ROLE.ROLE_CUSTOMER.name()));
 
-	    return jwtprovider.generateToken(authentication);
-	}
-	@Override
-	public void sentLoginOtp(String email,USER_ROLE role) {
+        Authentication authentication = new UsernamePasswordAuthenticationToken(
+                savedUser.getEmail(), null, authorities);
 
-	    String SIGNING_PREFIX = "signin_";
+        SecurityContextHolder.getContext().setAuthentication(authentication);
 
-	    if (email.startsWith(SIGNING_PREFIX)) {
+        return jwtProvider.generateToken(authentication);
+    }
 
-	        String actualEmail =
-	                email.substring(SIGNING_PREFIX.length());
-	        
-	        if(role.equals(USER_ROLE.ROLE_SELLER)) {
-	        	
-              Seller seller = sellerepo.findByEmail(actualEmail);
-	        	
-	        	if(seller==null) {
-	        		throw new RuntimeException("seller not found");
-	        	}
-	       
-	        }
-	        else {
-	         	System.out.println("email"+actualEmail);
-		        User user =	userepo.findByEmail(actualEmail)
-	                .orElseThrow(() ->
-	                        new UsernameNotFoundException(
-	                                "User not found with email: "
-	                                        + actualEmail));
-	        }
+    /**
+     * Sends a login/signup OTP to the given email.
+     * For login OTPs, verifies the account exists before sending.
+     * The "signin_" prefix in email indicates a login attempt (vs signup).
+     */
+    @Override
+    @Transactional
+    public void sentLoginOtp(String email, USER_ROLE role) {
 
-	        
-	        email = actualEmail;
-	    }
+        // Determine if this is a login (existing account) or signup (new account) OTP
+        boolean isLoginAttempt = email.startsWith("signin_");
+        String actualEmail = isLoginAttempt ? email.substring("signin_".length()) : email;
 
-	    VerificationCode existingOtp =
-	            repo.findByEmail(email);
+        if (isLoginAttempt) {
+            // Verify the account exists before sending OTP
+            if (role == USER_ROLE.ROLE_SELLER) {
+                Seller seller = sellerRepo.findByEmail(actualEmail);
+                if (seller == null) {
+                    throw new ResourceNotFoundException("Seller", "email", actualEmail);
+                }
+            } else {
+                userRepo.findByEmail(actualEmail)
+                        .orElseThrow(() -> new ResourceNotFoundException("User", "email", actualEmail));
+            }
+        }
 
-	    if (existingOtp != null) {
-	        repo.delete(existingOtp);
-	    }
+        // Invalidate any existing OTP for this email
+        VerificationCode existingOtp = verificationCodeRepo.findByEmail(actualEmail);
+        if (existingOtp != null) {
+            verificationCodeRepo.delete(existingOtp);
+        }
 
-	    String otp = OtpUtil.generateOtp();
+        String otp = OtpUtil.generateOtp();
 
-	    VerificationCode verificationCode =
-	            new VerificationCode();
+        VerificationCode verificationCode = new VerificationCode();
+        verificationCode.setEmail(actualEmail);
+        verificationCode.setOtp(otp);
+        verificationCode.setCreatedAt(LocalDateTime.now());
+        verificationCode.setExpiresAt(LocalDateTime.now().plusMinutes(otpExpiryMinutes));
 
-	    verificationCode.setEmail(email);
-	    verificationCode.setOtp(otp);
+        verificationCodeRepo.save(verificationCode);
 
-	    repo.save(verificationCode);
+        log.info("OTP sent to: {} (isLogin={})", actualEmail, isLoginAttempt);
 
-	    emailService.sendVerificationOtpEmail(
-	            email,
-	            otp,
-	            "Zosh Bazar Login/Signup OTP",
-	            "Use the following OTP to verify your account."
-	    );
-	}
-	@Override
-	public AuthResponse siging(LoginRequest req) {
+        emailService.sendVerificationOtpEmail(
+                actualEmail,
+                otp,
+                "ShopSphere Account Verification",
+                "Use the One-Time Password (OTP) below to verify your ShopSphere account.");
+    }
 
-	    String username = req.getEmail(); // keep prefix
-	    String otp = req.getOtp();
+    /**
+     * Authenticates a user/seller by verifying their OTP.
+     * Returns a JWT token on success.
+     */
+    @Override
+    @Transactional
+    public AuthResponse siging(LoginRequest req) {
 
-	    Authentication authentication =
-	            authenticate(username, otp);
+        Authentication authentication = authenticate(req.getEmail(), req.getOtp());
+        SecurityContextHolder.getContext().setAuthentication(authentication);
 
-	    SecurityContextHolder.getContext()
-	            .setAuthentication(authentication);
+        String token = jwtProvider.generateToken(authentication);
 
-	    String token =
-	            jwtprovider.generateToken(authentication);
+        AuthResponse response = new AuthResponse();
+        response.setJwt(token);
+        response.setMessage("Login successful");
 
-	    AuthResponse response = new AuthResponse();
-	    response.setJwt(token);
-	    response.setMessage("Login Success");
+        if (req.getEmail().startsWith(SELLER_PREFIX)) {
+            String email = req.getEmail().substring(SELLER_PREFIX.length());
+            Seller seller = sellerRepo.findByEmail(email);
+            if (seller == null) {
+                throw new ResourceNotFoundException("Seller", "email", email);
+            }
+            response.setRole(seller.getRole());
+        } else {
+            User user = userRepo.findByEmail(req.getEmail())
+                    .orElseThrow(() -> new ResourceNotFoundException("User", "email", req.getEmail()));
 
-	    if(username.startsWith("seller_")) {
+            if (!user.isEnabled()) {
+                throw new BadCredentialsException("Your account has been suspended. Please contact support.");
+            }
+            response.setRole(user.getRole());
+        }
 
-	        String email =
-	                username.substring("seller_".length());
+        return response;
+    }
 
-	        Seller seller =
-	                sellerepo.findByEmail(email);
+    private Authentication authenticate(String username, String otp) {
 
-	        response.setRole(seller.getRole());
+        UserDetails userDetails = customUserService.loadUserByUsername(username);
 
-	    } else {
+        // Extract the actual email (strip seller prefix if present)
+        String email = username.startsWith(SELLER_PREFIX)
+                ? username.substring(SELLER_PREFIX.length())
+                : username;
 
-	        User user = userepo.findByEmail(username)
-	                .orElseThrow(() ->
-	                        new UsernameNotFoundException(
-	                                "User not found"));
+        VerificationCode verificationCode = verificationCodeRepo.findByEmail(email);
 
-	        if(!user.isEnabled()) {
-	            throw new RuntimeException("Your account has been banned");
-	        }
+        if (verificationCode == null) {
+            throw new BadCredentialsException("No OTP found. Please request a new OTP.");
+        }
 
-	        response.setRole(user.getRole());
-	    }
-	    return response;
-	}
-	private Authentication authenticate(
-	        String username,
-	        String otp) {
+        if (verificationCode.isExpired()) {
+            verificationCodeRepo.delete(verificationCode);
+            throw new OtpExpiredException(email);
+        }
 
-	    UserDetails userDetails =
-	            customeUserServiceImpl.loadUserByUsername(username);
+        if (!verificationCode.getOtp().equals(otp)) {
+            throw new BadCredentialsException("Invalid OTP.");
+        }
 
-	    String email = username;
+        // Consume OTP — single use
+        verificationCodeRepo.delete(verificationCode);
 
-	    if(username.startsWith("seller_")) {
-	        email = username.substring("seller_".length());
-	    }
-
-	    VerificationCode verificationCode =
-	            repo.findByEmail(email);
-
-	    if (verificationCode == null) {
-	        throw new BadCredentialsException("OTP not found");
-	    }
-
-	    if (!verificationCode.getOtp().equals(otp)) {
-	        throw new BadCredentialsException("Invalid OTP");
-	    }
-
-	    repo.delete(verificationCode);
-
-	    return new UsernamePasswordAuthenticationToken(
-	            userDetails,
-	            null,
-	            userDetails.getAuthorities());
-	}
-	}
-
+        return new UsernamePasswordAuthenticationToken(
+                userDetails, null, userDetails.getAuthorities());
+    }
+}
