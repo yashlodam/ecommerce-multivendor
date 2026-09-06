@@ -10,8 +10,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.mail.javamail.JavaMailSender;
-import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
@@ -19,24 +17,14 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
-import jakarta.mail.internet.MimeMessage;
-
 @Service
 public class EmailService {
 
     private static final Logger log = LoggerFactory.getLogger(EmailService.class);
-
-    @Autowired(required = false)
-    private JavaMailSender javaMailSender;
+    private static final String RESEND_API_URL = "https://api.resend.com/emails";
 
     @Autowired
     private ObjectMapper objectMapper;
-
-    @Value("${spring.mail.username:}")
-    private String mailUsername;
-
-    @Value("${spring.mail.password:}")
-    private String mailPassword;
 
     @Value("${app.email.resend.api-key:}")
     private String resendApiKey;
@@ -44,22 +32,26 @@ public class EmailService {
     @Value("${app.email.resend.from:ShopSphere <onboarding@resend.dev>}")
     private String resendFrom;
 
-    @Value("${app.email.brevo.api-key:}")
-    private String brevoApiKey;
-
-    @Value("${app.email.brevo.from-email:noreply@shopsphere.com}")
-    private String brevoFromEmail;
-
-    @Value("${app.email.brevo.from-name:ShopSphere}")
-    private String brevoFromName;
-
-    private final HttpClient httpClient = HttpClient.newBuilder()
+    private HttpClient httpClient = HttpClient.newBuilder()
             .connectTimeout(Duration.ofSeconds(5))
             .build();
 
+    void setHttpClient(HttpClient httpClient) {
+        this.httpClient = httpClient;
+    }
+
+    void setResendApiKey(String resendApiKey) {
+        this.resendApiKey = resendApiKey;
+    }
+
+    void setResendFrom(String resendFrom) {
+        this.resendFrom = resendFrom;
+    }
+
     /**
-     * Sends a verification OTP email asynchronously so the HTTP request
-     * completes immediately (< 50ms) without waiting for SMTP or network timeouts.
+     * Sends a verification OTP email asynchronously via the Resend HTTPS API.
+     * Operates over standard HTTPS (port 443), avoiding SMTP port blocks on cloud hosts like Render.
+     * Note: In accordance with security standards, OTP values and API keys are never logged.
      */
     @Async
     public void sendVerificationOtpEmail(
@@ -68,107 +60,41 @@ public class EmailService {
             String subject,
             String text) {
 
-        String htmlContent = buildHtmlContent(otp, text);
+        if (resendApiKey == null || resendApiKey.isBlank()) {
+            log.warn("[Resend Email Service] RESEND_API_KEY is not configured. Email dispatch to {} skipped. Set RESEND_API_KEY in environment to enable email delivery.", userEmail);
+            return;
+        }
 
-        // 1. Resend HTTPS API (Recommended for Render Free Tier — HTTPS port 443 is never blocked)
-        if (resendApiKey != null && !resendApiKey.isBlank()) {
-            try {
-                sendViaResend(userEmail, subject, htmlContent);
-                log.info("OTP email sent successfully via Resend HTTPS API to {}", userEmail);
-                return;
-            } catch (Exception e) {
-                log.error("Resend API delivery failed for {}: {}", userEmail, e.getMessage());
+        try {
+            String htmlContent = buildHtmlContent(otp, text);
+
+            ObjectNode body = objectMapper.createObjectNode();
+            body.put("from", resendFrom != null && !resendFrom.isBlank() ? resendFrom.trim() : "ShopSphere <onboarding@resend.dev>");
+            ArrayNode toArray = body.putArray("to");
+            toArray.add(userEmail);
+            body.put("subject", subject);
+            body.put("html", htmlContent);
+
+            String requestBody = objectMapper.writeValueAsString(body);
+
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(RESEND_API_URL))
+                    .header("Authorization", "Bearer " + resendApiKey.trim())
+                    .header("Content-Type", "application/json")
+                    .timeout(Duration.ofSeconds(10))
+                    .POST(HttpRequest.BodyPublishers.ofString(requestBody))
+                    .build();
+
+            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+
+            if (response.statusCode() >= 200 && response.statusCode() < 300) {
+                log.info("OTP verification email dispatched successfully via Resend HTTPS API to {}", userEmail);
+            } else {
+                log.error("Resend API returned non-success response for {}: HTTP status {}", userEmail, response.statusCode());
             }
-        }
 
-        // 2. Brevo HTTPS API (port 443)
-        if (brevoApiKey != null && !brevoApiKey.isBlank()) {
-            try {
-                sendViaBrevo(userEmail, subject, htmlContent);
-                log.info("OTP email sent successfully via Brevo HTTPS API to {}", userEmail);
-                return;
-            } catch (Exception e) {
-                log.error("Brevo API delivery failed for {}: {}", userEmail, e.getMessage());
-            }
-        }
-
-        // 3. JavaMailSender SMTP (port 587/465 — works locally or on paid hosting)
-        if (mailUsername != null && !mailUsername.isBlank()
-                && mailPassword != null && !mailPassword.isBlank()
-                && javaMailSender != null) {
-            try {
-                MimeMessage mimeMessage = javaMailSender.createMimeMessage();
-                MimeMessageHelper helper = new MimeMessageHelper(mimeMessage, true, "UTF-8");
-                helper.setTo(userEmail);
-                helper.setSubject(subject);
-                helper.setText(htmlContent, true);
-
-                javaMailSender.send(mimeMessage);
-                log.info("OTP email sent successfully via SMTP to {}", userEmail);
-                return;
-            } catch (Exception e) {
-                log.error("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-                log.error("SMTP DELIVERY FAILED for {}: {}", userEmail, e.getMessage());
-                log.error("[RENDER NOTICE] Render Free Tier blocks outbound SMTP ports (25, 465, 587).");
-                log.error("FALLBACK: LOGIN / SIGNUP OTP FOR [{}] IS: >>> {} <<<", userEmail, otp);
-                log.error("To send real emails on Render Free Tier, get a free key at https://resend.com and add RESEND_API_KEY in Render.");
-                log.error("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-                return;
-            }
-        }
-
-        // 4. Fallback: No email credentials configured
-        log.warn("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-        log.warn("[EMAIL SERVICE NOTICE] No email provider configured.");
-        log.warn("LOGIN / SIGNUP OTP FOR [{}] IS: >>> {} <<<", userEmail, otp);
-        log.warn("To receive emails in your inbox, set RESEND_API_KEY in Render Environment Variables (free at https://resend.com).");
-        log.warn("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-    }
-
-    private void sendViaResend(String toEmail, String subject, String html) throws Exception {
-        ObjectNode body = objectMapper.createObjectNode();
-        body.put("from", resendFrom);
-        ArrayNode toArray = body.putArray("to");
-        toArray.add(toEmail);
-        body.put("subject", subject);
-        body.put("html", html);
-
-        HttpRequest request = HttpRequest.newBuilder()
-                .uri(URI.create("https://api.resend.com/emails"))
-                .header("Authorization", "Bearer " + resendApiKey.trim())
-                .header("Content-Type", "application/json")
-                .timeout(Duration.ofSeconds(10))
-                .POST(HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(body)))
-                .build();
-
-        HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
-        if (response.statusCode() >= 400) {
-            throw new RuntimeException("Resend API HTTP " + response.statusCode() + ": " + response.body());
-        }
-    }
-
-    private void sendViaBrevo(String toEmail, String subject, String html) throws Exception {
-        ObjectNode body = objectMapper.createObjectNode();
-        ObjectNode sender = body.putObject("sender");
-        sender.put("name", brevoFromName);
-        sender.put("email", brevoFromEmail);
-        ArrayNode toArray = body.putArray("to");
-        ObjectNode recipient = toArray.addObject();
-        recipient.put("email", toEmail);
-        body.put("subject", subject);
-        body.put("htmlContent", html);
-
-        HttpRequest request = HttpRequest.newBuilder()
-                .uri(URI.create("https://api.brevo.com/v3/smtp/email"))
-                .header("api-key", brevoApiKey.trim())
-                .header("Content-Type", "application/json")
-                .timeout(Duration.ofSeconds(10))
-                .POST(HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(body)))
-                .build();
-
-        HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
-        if (response.statusCode() >= 400) {
-            throw new RuntimeException("Brevo API HTTP " + response.statusCode() + ": " + response.body());
+        } catch (Exception e) {
+            log.error("Error occurred while dispatching verification email to {}: {}", userEmail, e.getMessage());
         }
     }
 

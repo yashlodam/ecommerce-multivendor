@@ -19,8 +19,8 @@ import org.springframework.test.context.TestPropertySource;
     "app.jwt.secret=test-secret-key-at-least-64-characters-long-for-hs512-algorithm",
     "payment.razorpay.key-id=rzp_test_key",
     "payment.razorpay.key-secret=test_secret",
-    "spring.mail.username=test@test.com",
-    "spring.mail.password=test",
+    "app.email.resend.api-key=re_test_dummy_key",
+    "app.email.resend.from=ShopSphere <onboarding@resend.dev>",
     "app.admin.email=admin@test.com",
     "app.admin.password=Admin@Test123"
 })

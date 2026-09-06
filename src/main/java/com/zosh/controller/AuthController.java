@@ -60,9 +60,6 @@ public class AuthController {
     @Autowired
     private SellerRepository sellerRepository;
 
-    @Value("${app.otp.expose-in-response:false}")
-    private boolean exposeOtpInResponse;
-
     @PostMapping("/signup")
     @Operation(summary = "Register a new customer account using OTP, issuing short-lived access token and HttpOnly refresh cookie")
     public ResponseEntity<AuthResponse> createUserHandler(
@@ -84,12 +81,9 @@ public class AuthController {
     public ResponseEntity<ApiResponse> sendOtpHandler(
             @Valid @RequestBody LoginOtpRequest req) {
 
-        String otp = authservice.sentLoginOtp(req.getEmail(), req.getRole());
+        authservice.sentLoginOtp(req.getEmail(), req.getRole());
 
         ApiResponse res = new ApiResponse("OTP sent successfully");
-        if (exposeOtpInResponse) {
-            res.setOtp(otp);
-        }
         return ResponseEntity.ok(res);
     }
 

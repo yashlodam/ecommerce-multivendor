@@ -166,7 +166,7 @@ class AuthControllerTest {
     }
 
     @Test
-    @DisplayName("sendOtpHandler should invoke authService and return success")
+    @DisplayName("sendOtpHandler should invoke authService and return success ApiResponse")
     void sendOtp_success() {
         com.zosh.response.LoginOtpRequest req = new com.zosh.response.LoginOtpRequest();
         req.setEmail("user@example.com");
@@ -180,24 +180,6 @@ class AuthControllerTest {
         assertNotNull(response.getBody());
         assertTrue(response.getBody().isSuccess());
         assertEquals("OTP sent successfully", response.getBody().getMessage());
-        assertNull(response.getBody().getOtp()); // Default: hidden in production
-    }
-
-    @Test
-    @DisplayName("sendOtpHandler with exposeOtpInResponse=true should include OTP in payload")
-    void sendOtp_withExposeOtpEnabled() {
-        ReflectionTestUtils.setField(authController, "exposeOtpInResponse", true);
-
-        com.zosh.response.LoginOtpRequest req = new com.zosh.response.LoginOtpRequest();
-        req.setEmail("user@example.com");
-        req.setRole(USER_ROLE.ROLE_CUSTOMER);
-
-        when(authService.sentLoginOtp("user@example.com", USER_ROLE.ROLE_CUSTOMER)).thenReturn("654321");
-
-        ResponseEntity<ApiResponse> response = authController.sendOtpHandler(req);
-
-        assertEquals(HttpStatus.OK, response.getStatusCode());
-        assertNotNull(response.getBody());
-        assertEquals("654321", response.getBody().getOtp());
+        verify(authService, times(1)).sentLoginOtp("user@example.com", USER_ROLE.ROLE_CUSTOMER);
     }
 }
