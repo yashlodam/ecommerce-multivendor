@@ -123,7 +123,7 @@ public class AuthServiceImpl implements AuthService {
      */
     @Override
     @Transactional
-    public void sentLoginOtp(String email, USER_ROLE role) {
+    public String sentLoginOtp(String email, USER_ROLE role) {
 
         // Determine if this is a login (existing account) or signup (new account) OTP
         boolean isLoginAttempt = email.startsWith("signin_");
@@ -165,6 +165,8 @@ public class AuthServiceImpl implements AuthService {
                 otp,
                 "ShopSphere Account Verification",
                 "Use the One-Time Password (OTP) below to verify your ShopSphere account.");
+
+        return otp;
     }
 
     /**

@@ -11,7 +11,7 @@ public interface AuthService {
 
     String createUser(SignupRequest request);
 
-    void sentLoginOtp(String email,USER_ROLE roleo);
+    String sentLoginOtp(String email, USER_ROLE role);
     
     AuthResponse siging(LoginRequest req);
 

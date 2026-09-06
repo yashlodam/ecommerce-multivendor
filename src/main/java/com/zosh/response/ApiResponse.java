@@ -6,6 +6,7 @@ public class ApiResponse {
 
     private boolean success = true;
     private String message;
+    private String otp;
     private LocalDateTime timestamp = LocalDateTime.now();
 
     public ApiResponse() {
@@ -23,6 +24,13 @@ public class ApiResponse {
         this.timestamp = LocalDateTime.now();
     }
 
+    public ApiResponse(String message, String otp) {
+        this.message = message;
+        this.otp = otp;
+        this.success = true;
+        this.timestamp = LocalDateTime.now();
+    }
+
     public boolean isSuccess() {
         return success;
     }
@@ -37,6 +45,14 @@ public class ApiResponse {
 
     public void setMessage(String message) {
         this.message = message;
+    }
+
+    public String getOtp() {
+        return otp;
+    }
+
+    public void setOtp(String otp) {
+        this.otp = otp;
     }
 
     public LocalDateTime getTimestamp() {

@@ -232,4 +232,32 @@ class AuthServiceImplTest {
         // OTP should be consumed after use to prevent replay attacks
         verify(verificationCodeRepo).delete(vc);
     }
+
+    @Test
+    @DisplayName("sentLoginOtp: saves OTP, invokes email service, and returns generated OTP")
+    void sentLoginOtp_savesOtpAndReturnsValue() {
+        String email = "customer@example.com";
+        when(verificationCodeRepo.findByEmail(email)).thenReturn(null);
+
+        String returnedOtp = authService.sentLoginOtp(email, USER_ROLE.ROLE_CUSTOMER);
+
+        assertNotNull(returnedOtp);
+        assertEquals(6, returnedOtp.length());
+        verify(verificationCodeRepo).save(any(VerificationCode.class));
+        verify(emailService).sendVerificationOtpEmail(eq(email), eq(returnedOtp), anyString(), anyString());
+    }
+
+    @Test
+    @DisplayName("sentLoginOtp: invalidates previous OTP before issuing new one")
+    void sentLoginOtp_replacesPreviousOtp() {
+        String email = "customer@example.com";
+        VerificationCode oldVc = validOtp(email, "999999");
+        when(verificationCodeRepo.findByEmail(email)).thenReturn(oldVc);
+
+        String returnedOtp = authService.sentLoginOtp(email, USER_ROLE.ROLE_CUSTOMER);
+
+        assertNotNull(returnedOtp);
+        verify(verificationCodeRepo).delete(oldVc);
+        verify(verificationCodeRepo).save(any(VerificationCode.class));
+    }
 }
