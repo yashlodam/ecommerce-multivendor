@@ -3,6 +3,7 @@ package com.zosh.service;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Service;
@@ -17,11 +18,27 @@ public class EmailService {
     @Autowired
     private JavaMailSender javaMailSender;
 
+    @Value("${spring.mail.username:}")
+    private String mailUsername;
+
+    @Value("${spring.mail.password:}")
+    private String mailPassword;
+
     public void sendVerificationOtpEmail(
             String userEmail,
             String otp,
             String subject,
             String text) {
+
+        // If email service credentials are not configured, log OTP to console so login/signup still works!
+        if (mailUsername == null || mailUsername.isBlank() || mailPassword == null || mailPassword.isBlank()) {
+            log.warn("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+            log.warn("[EMAIL SERVICE NOTICE] MAIL_USERNAME or MAIL_PASSWORD is not set in environment.");
+            log.warn("LOGIN / SIGNUP OTP FOR [{}] IS: >>> {} <<<", userEmail, otp);
+            log.warn("To receive real emails in your inbox, set MAIL_USERNAME and MAIL_PASSWORD (Gmail App Password) in Render.");
+            log.warn("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+            return;
+        }
 
         try {
 
@@ -111,14 +128,16 @@ public class EmailService {
 
             javaMailSender.send(mimeMessage);
 
-            log.info("OTP email sent successfully to {}", userEmail);
+            log.info("OTP email sent successfully via SMTP to {}", userEmail);
 
         } catch (Exception e) {
 
-            log.error("Failed to send email to {}: {}", userEmail, e.getMessage(), e);
-
-            throw new RuntimeException(
-                    "Unable to send OTP email to " + userEmail, e);
+            log.error("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+            log.error("SMTP DELIVERY FAILED for {}: {}", userEmail, e.getMessage());
+            log.error("FALLBACK: LOGIN / SIGNUP OTP FOR [{}] IS: >>> {} <<<", userEmail, otp);
+            log.error("Please verify your Gmail App Password and SMTP settings in Render.");
+            log.error("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+            // Do not throw RuntimeException — prevents transaction rollback so OTP is usable
         }
     }
 }
