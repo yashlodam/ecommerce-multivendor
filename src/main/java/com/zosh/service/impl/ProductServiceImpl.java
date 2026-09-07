@@ -312,14 +312,14 @@ public class ProductServiceImpl implements ProductService {
 	            ProductSpecification.search(parsedQuery.getTokens(), true)
 	    ).and(filterSpec);
 
-	    List<Product> candidates = productrepo.findAll(searchSpec);
+	    List<Product> candidates = new ArrayList<>(productrepo.findAll(searchSpec, PageRequest.of(0, 100)).getContent());
 
 	    // Fallback: If 0 results and query was corrected or multi-word, try soft-match (any token)
 	    if (candidates.isEmpty() && (parsedQuery.isCorrected() || parsedQuery.getTokens().size() > 1)) {
 	        Specification<Product> fallbackSpec = Specification.where(
 	                ProductSpecification.search(parsedQuery.getTokens(), false)
 	        ).and(filterSpec);
-	        candidates = productrepo.findAll(fallbackSpec);
+	        candidates = new ArrayList<>(productrepo.findAll(fallbackSpec, PageRequest.of(0, 100)).getContent());
 	    }
 
 	    // Score and rank all candidate matches by relevance
@@ -357,15 +357,15 @@ public class ProductServiceImpl implements ProductService {
 	        Set<Long> categoryIds = resolveCategoryIds(category);
 	        if (!categoryIds.isEmpty()) {
 	            spec = spec.and((root, q, cb) -> {
-	                Join<Product, Category> categoryJoin = ProductSpecification.getOrCreateCategoryJoin(root);
+	                Join<Product, Category> categoryJoin = root.join("category", JoinType.LEFT);
 	                return categoryJoin.get("id").in(categoryIds);
 	            });
 	        } else {
 	            String cleanCategory = category.trim().toLowerCase();
 	            spec = spec.and((root, q, cb) -> {
-	                Join<Product, Category> categoryJoin = ProductSpecification.getOrCreateCategoryJoin(root);
-	                Join<Category, Category> parentJoin = ProductSpecification.getOrCreateParentJoin(categoryJoin);
-	                Join<Category, Category> grandParentJoin = ProductSpecification.getOrCreateParentJoin(parentJoin);
+	                Join<Product, Category> categoryJoin = root.join("category", JoinType.LEFT);
+	                Join<Category, Category> parentJoin = categoryJoin.join("parentCategory", JoinType.LEFT);
+	                Join<Category, Category> grandParentJoin = parentJoin.join("parentCategory", JoinType.LEFT);
 
 	                Predicate currentCategory = cb.equal(cb.lower(categoryJoin.get("categoryId")), cleanCategory);
 	                Predicate parentCategory = cb.equal(cb.lower(parentJoin.get("categoryId")), cleanCategory);
@@ -494,12 +494,12 @@ public class ProductServiceImpl implements ProductService {
 	    }
 
 	    Specification<Product> spec = ProductSpecification.search(parsedQuery.getTokens(), true);
-	    List<Product> candidates = productrepo.findAll(spec);
+	    List<Product> candidates = new ArrayList<>(productrepo.findAll(spec, PageRequest.of(0, 50)).getContent());
 
 	    // Fallback if strict match-all yielded nothing
 	    if (candidates.isEmpty() && (parsedQuery.isCorrected() || parsedQuery.getTokens().size() > 1)) {
 	        Specification<Product> fallbackSpec = ProductSpecification.search(parsedQuery.getTokens(), false);
-	        candidates = productrepo.findAll(fallbackSpec);
+	        candidates = new ArrayList<>(productrepo.findAll(fallbackSpec, PageRequest.of(0, 50)).getContent());
 	    }
 
 	    List<Product> ranked = getSearchRelevanceRanker().rank(candidates, parsedQuery);

@@ -12,12 +12,11 @@ import com.zosh.model.Product;
 import jakarta.persistence.criteria.Join;
 import jakarta.persistence.criteria.JoinType;
 import jakarta.persistence.criteria.Predicate;
-import jakarta.persistence.criteria.Root;
 
 /**
  * Production search specifications for ShopSphere products catalog.
  * Supports multi-token search across titles, brands, categories, descriptions,
- * and colors with join reuse and query deduplication.
+ * and colors with distinct query execution.
  */
 public class ProductSpecification {
 
@@ -36,9 +35,13 @@ public class ProductSpecification {
                 return cb.conjunction();
             }
 
-            Join<Product, Category> category = getOrCreateCategoryJoin(root);
-            Join<Category, Category> parent = getOrCreateParentJoin(category);
-            Join<Category, Category> grandParent = getOrCreateParentJoin(parent);
+            if (cq.getResultType() != Long.class && cq.getResultType() != long.class) {
+                cq.distinct(true);
+            }
+
+            Join<Product, Category> category = root.join("category", JoinType.LEFT);
+            Join<Category, Category> parent = category.join("parentCategory", JoinType.LEFT);
+            Join<Category, Category> grandParent = parent.join("parentCategory", JoinType.LEFT);
 
             List<Predicate> tokenPredicates = new ArrayList<>();
 
@@ -83,25 +86,5 @@ public class ProductSpecification {
         String normalized = query.toLowerCase(Locale.ROOT).trim().replaceAll("\\s+", " ");
         List<String> tokens = List.of(normalized.split(" "));
         return search(tokens, true);
-    }
-
-    @SuppressWarnings("unchecked")
-    public static Join<Product, Category> getOrCreateCategoryJoin(Root<Product> root) {
-        for (Join<Product, ?> j : root.getJoins()) {
-            if ("category".equals(j.getAttribute().getName())) {
-                return (Join<Product, Category>) j;
-            }
-        }
-        return root.join("category", JoinType.LEFT);
-    }
-
-    @SuppressWarnings("unchecked")
-    public static Join<Category, Category> getOrCreateParentJoin(Join<?, Category> categoryJoin) {
-        for (Join<Category, ?> j : categoryJoin.getJoins()) {
-            if ("parentCategory".equals(j.getAttribute().getName())) {
-                return (Join<Category, Category>) j;
-            }
-        }
-        return categoryJoin.join("parentCategory", JoinType.LEFT);
     }
 }
