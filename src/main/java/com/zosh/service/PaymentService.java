@@ -19,6 +19,7 @@ public interface PaymentService {
 	        PaymentMethod paymentMethod);
 	PaymentOrder getPaymentOrderById(Long orderId);
 	PaymentOrder getPaymentOrderByPaymentId(String paymentId);
+	PaymentOrder resolvePaymentOrderFromRazorpayPayment(String paymentId);
 	Boolean ProceedPaymentOrder(PaymentOrder paymentOrder,String paymentId,String paymentLinkId) throws RazorpayException, SellerException;
 	
 	PaymentLink createRazorpayPaymetnLink(User user,Long amount,Long orderId) throws RazorpayException;

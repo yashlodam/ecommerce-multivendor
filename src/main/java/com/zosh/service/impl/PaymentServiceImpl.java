@@ -116,11 +116,108 @@ public class PaymentServiceImpl implements PaymentService {
 
     @Override
     public PaymentOrder getPaymentOrderByPaymentId(String paymentId) {
-        PaymentOrder order = paymentOrderRepository.findByPaymentLinkId(paymentId);
-        if (order == null) {
-            throw new ResourceNotFoundException("PaymentOrder", "paymentLinkId", paymentId);
+        if (paymentId == null || paymentId.isBlank()) {
+            throw new ResourceNotFoundException("PaymentOrder", "paymentLinkId", "null");
         }
-        return order;
+
+        PaymentOrder order = null;
+
+        // 1. If identifier starts with "order_", check razorpayOrderId first, then paymentLinkId
+        if (paymentId.startsWith("order_")) {
+            order = paymentOrderRepository.findByRazorpayOrderId(paymentId);
+            if (order == null) {
+                order = paymentOrderRepository.findByPaymentLinkId(paymentId);
+            }
+        }
+        // 2. If identifier starts with "plink_", check paymentLinkId first, then razorpayOrderId
+        else if (paymentId.startsWith("plink_")) {
+            order = paymentOrderRepository.findByPaymentLinkId(paymentId);
+            if (order == null) {
+                order = paymentOrderRepository.findByRazorpayOrderId(paymentId);
+            }
+        }
+        // 3. Fallback: check paymentLinkId first, then razorpayOrderId
+        else {
+            order = paymentOrderRepository.findByPaymentLinkId(paymentId);
+            if (order == null) {
+                order = paymentOrderRepository.findByRazorpayOrderId(paymentId);
+            }
+        }
+
+        if (order != null) {
+            return order;
+        }
+
+        // 4. Try numeric database ID lookup (e.g. if orderRef or paymentOrderId was passed)
+        try {
+            Long numericId = Long.parseLong(paymentId);
+            return paymentOrderRepository.findById(numericId)
+                    .orElseThrow(() -> new ResourceNotFoundException("PaymentOrder", "id", paymentId));
+        } catch (NumberFormatException ignored) {
+            // Not a numeric ID
+        }
+
+        throw new ResourceNotFoundException("PaymentOrder", "paymentLinkId", paymentId);
+    }
+
+    @Override
+    public PaymentOrder resolvePaymentOrderFromRazorpayPayment(String paymentId) {
+        if (paymentId == null || paymentId.isBlank()) {
+            return null;
+        }
+        if (razorpayKeyId == null || razorpayKeyId.isBlank() || razorpayKeySecret == null || razorpayKeySecret.isBlank()) {
+            return null;
+        }
+
+        try {
+            RazorpayClient razorpay = new RazorpayClient(razorpayKeyId, razorpayKeySecret);
+            Payment payment = razorpay.payments.fetch(paymentId);
+
+            if (payment != null) {
+                // 1. Try finding by Razorpay order_id
+                if (payment.has("order_id")) {
+                    Object orderIdObj = payment.get("order_id");
+                    if (orderIdObj != null) {
+                        String rzpOrderId = orderIdObj.toString();
+                        if (!rzpOrderId.isBlank() && !"null".equalsIgnoreCase(rzpOrderId)) {
+                            PaymentOrder order = paymentOrderRepository.findByRazorpayOrderId(rzpOrderId);
+                            if (order != null) {
+                                log.info("Resolved PaymentOrder #{} via Razorpay payment order_id: {}", order.getId(), rzpOrderId);
+                                return order;
+                            }
+                            order = paymentOrderRepository.findByPaymentLinkId(rzpOrderId);
+                            if (order != null) {
+                                log.info("Resolved PaymentOrder #{} via paymentLinkId fallback: {}", order.getId(), rzpOrderId);
+                                return order;
+                            }
+                        }
+                    }
+                }
+
+                // 2. Try finding by notes.paymentOrderId
+                if (payment.has("notes")) {
+                    JSONObject notes = payment.get("notes");
+                    if (notes != null && notes.has("paymentOrderId")) {
+                        Object poIdObj = notes.get("paymentOrderId");
+                        if (poIdObj != null) {
+                            try {
+                                Long poId = Long.parseLong(poIdObj.toString());
+                                PaymentOrder order = paymentOrderRepository.findById(poId).orElse(null);
+                                if (order != null) {
+                                    log.info("Resolved PaymentOrder #{} via Razorpay payment note 'paymentOrderId'", order.getId());
+                                    return order;
+                                }
+                            } catch (NumberFormatException ignored) {
+                            }
+                        }
+                    }
+                }
+            }
+        } catch (Exception e) {
+            log.warn("Could not resolve payment order from Razorpay payment {}: {}", paymentId, e.getMessage());
+        }
+
+        return null;
     }
 
     /**
@@ -160,6 +257,20 @@ public class PaymentServiceImpl implements PaymentService {
             String status = payment.get("status");
 
             log.info("Razorpay payment {} status: {}", paymentId, status);
+
+            if ("authorized".equals(status)) {
+                log.info("Payment {} is authorized; attempting auto-capture...", paymentId);
+                try {
+                    JSONObject captureRequest = new JSONObject();
+                    captureRequest.put("amount", payment.get("amount"));
+                    captureRequest.put("currency", payment.get("currency"));
+                    payment = payment.capture(captureRequest);
+                    status = payment.get("status");
+                    log.info("Payment {} captured status: {}", paymentId, status);
+                } catch (Exception capEx) {
+                    log.error("Failed to auto-capture authorized payment {}: {}", paymentId, capEx.getMessage());
+                }
+            }
 
             if ("captured".equals(status)) {
                 Cart cart = cartService.findUserCart(paymentOrder.getUser());
@@ -368,7 +479,10 @@ public class PaymentServiceImpl implements PaymentService {
             String razorpayOrderId = razorpayOrder.get("id");
 
             PaymentOrder paymentOrder = getPaymentOrderById(orderId);
-            paymentOrder.setPaymentLinkId(razorpayOrderId);
+            paymentOrder.setRazorpayOrderId(razorpayOrderId);
+            if (paymentOrder.getPaymentLinkId() == null || paymentOrder.getPaymentLinkId().isBlank()) {
+                paymentOrder.setPaymentLinkId(razorpayOrderId);
+            }
             paymentOrderRepository.save(paymentOrder);
 
             log.info("Razorpay Standard Order created successfully: razorpayOrderId={} orderId={}",

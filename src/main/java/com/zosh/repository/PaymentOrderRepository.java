@@ -7,5 +7,6 @@ import com.zosh.model.PaymentOrder;
 public interface PaymentOrderRepository extends JpaRepository<PaymentOrder, Long> {
 
 	PaymentOrder findByPaymentLinkId(String paymentId);
-	
+
+	PaymentOrder findByRazorpayOrderId(String razorpayOrderId);
 }

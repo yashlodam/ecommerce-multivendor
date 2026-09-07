@@ -21,6 +21,7 @@ import jakarta.persistence.Table;
     name = "payment_orders",
     indexes = {
         @Index(name = "idx_pay_order_link_id", columnList = "paymentLinkId"),
+        @Index(name = "idx_pay_order_rzp_order_id", columnList = "razorpayOrderId"),
         @Index(name = "idx_pay_order_user_id", columnList = "user_id"),
         @Index(name = "idx_pay_order_status", columnList = "status")
     }
@@ -42,6 +43,8 @@ public class PaymentOrder {
     private PaymentMethod paymentMethod;
 
     private String paymentLinkId;
+
+    private String razorpayOrderId;
 
     @ManyToOne
     @JoinColumn(name = "user_id")
@@ -94,6 +97,14 @@ public class PaymentOrder {
 
     public void setPaymentLinkId(String paymentLinkId) {
         this.paymentLinkId = paymentLinkId;
+    }
+
+    public String getRazorpayOrderId() {
+        return razorpayOrderId;
+    }
+
+    public void setRazorpayOrderId(String razorpayOrderId) {
+        this.razorpayOrderId = razorpayOrderId;
     }
 
     public User getUser() {
