@@ -11,6 +11,7 @@ import org.springframework.stereotype.Service;
 
 import com.zosh.domain.HomeCategorySection;
 import com.zosh.model.Deal;
+
 import com.zosh.model.Home;
 import com.zosh.model.HomeCategory;
 import com.zosh.repository.DealRepository;

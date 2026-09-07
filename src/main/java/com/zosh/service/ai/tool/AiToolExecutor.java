@@ -249,7 +249,28 @@ public class AiToolExecutor {
         String color = getStringArg(args, "color", null);
         String size = getStringArg(args, "size", null);
 
+        // Normalize specific category mappings
         String cleanQuery = cleanSearchQuery(query);
+        String queryLower = cleanQuery.toLowerCase();
+
+        if (category == null || category.isBlank()) {
+            if (queryLower.matches(".*\\b(t\\s*-?\\s*shirts?|tees?)\\b.*")) {
+                category = "men_tshirts";
+                cleanQuery = "T-Shirt";
+            } else if (queryLower.matches(".*\\b(phones?|mobiles?|smartphones?)\\b.*")) {
+                category = "electronics_smartphones";
+                cleanQuery = (brand != null && !brand.isBlank()) ? brand : "smartphone";
+            } else if (queryLower.matches(".*\\b(gaming\\s*laptops?|laptops?)\\b.*")) {
+                category = "electronics_gaming_laptops";
+                cleanQuery = "laptop";
+            } else if (queryLower.matches(".*\\b(smart\\s*watch(?:es)?|watches?)\\b.*")) {
+                category = "electronics_smart_watches";
+                cleanQuery = "smartwatch";
+            } else if (queryLower.matches(".*\\b(kurtas?|kurtis?)\\b.*")) {
+                category = "women_kurtas";
+                cleanQuery = "kurta";
+            }
+        }
 
         Page<Product> page = productService.getAllProducts(
                 cleanQuery, category, brand, color, size,
@@ -278,18 +299,38 @@ public class AiToolExecutor {
                     minPrice, maxPrice, null, "price_low", "in_stock", 0);
         }
 
-        List<AiProductDto> ranked = rankingService.rank(page.getContent(), maxPrice, query);
+        List<AiProductDto> ranked = (category != null)
+                ? rankingService.rank(page.getContent(), maxPrice, cleanQuery, category)
+                : rankingService.rank(page.getContent(), maxPrice, cleanQuery);
 
         Map<String, Object> result = new HashMap<>();
         result.put("totalResults", page.getTotalElements());
         result.put("products", ranked);
         result.put("resultCount", ranked.size());
+
+        // Smart Near-Match Fallback: If 0 results within budget, find closest available real items
+        if (ranked.isEmpty() && maxPrice != null) {
+            Page<Product> relaxedPage = productService.getAllProducts(
+                    cleanQuery, category, brand, color, size,
+                    null, null, null, "price_low", "in_stock", 0);
+            if (!relaxedPage.isEmpty()) {
+                List<AiProductDto> relaxedRanked = rankingService.rank(relaxedPage.getContent(), null, cleanQuery, category);
+                if (!relaxedRanked.isEmpty()) {
+                    result.put("closestPrice", relaxedRanked.get(0).getSellingPrice());
+                    result.put("closestProducts", relaxedRanked);
+                }
+            }
+        }
+
         return result;
     }
 
     private String cleanSearchQuery(String query) {
         if (query == null || query.isBlank()) return "";
-        String cleaned = query.replaceAll("(?i)\\b(show|me|find|get|give|look|looking|for|a|an|the|best|good|can|you|please|some|any|all|i|want|need|buy|recommend|top|product|products|item|items)\\b", " ");
+        // Strip price clauses, command prefixes, and non-discriminating fillers
+        String cleaned = query.replaceAll("(?i)(?:price\\s*(?:is|was)?\\s*)?(?:under|below|less than|within|upto|up to|max|budget|<=?)\\s*(?:rs\\.?|inr|\\u20b9)?\\s*\\d+", " ");
+        cleaned = cleaned.replaceAll("(?i)\\b(show|me|find|get|give|look|looking|for|a|an|the|best|good|can|you|please|some|any|all|i|want|need|buy|recommend|top|product|products|item|items|price|cost|rate)\\b", " ");
+        cleaned = cleaned.replaceAll("[^a-zA-Z0-9\\s-]", " ");
         cleaned = cleaned.replaceAll("\\s+", " ").trim();
         return cleaned;
     }
