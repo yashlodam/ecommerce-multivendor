@@ -30,6 +30,11 @@ import com.zosh.repository.WishlistRepository;
 import com.zosh.request.CreateProductRequest;
 import com.zosh.request.ProductVariantRequest;
 import com.zosh.service.ProductService;
+import com.zosh.service.search.CatalogDictionaryService;
+import com.zosh.service.search.SearchQueryParser;
+import com.zosh.service.search.SearchRelevanceRanker;
+import org.springframework.data.domain.PageImpl;
+
 import com.zosh.utils.OtpUtil;
 
 import jakarta.persistence.criteria.Join;
@@ -59,6 +64,31 @@ public class ProductServiceImpl implements ProductService {
 
 	@Autowired
 	private WishlistRepository wishlistRepository;
+	@Autowired
+	private SearchQueryParser searchQueryParser;
+
+	@Autowired
+	private SearchRelevanceRanker searchRelevanceRanker;
+
+	@Autowired
+	private CatalogDictionaryService catalogDictionaryService;
+
+	private SearchQueryParser getSearchQueryParser() {
+		if (searchQueryParser == null) {
+			CatalogDictionaryService dict = catalogDictionaryService != null ? catalogDictionaryService : new CatalogDictionaryService(productrepo, categoryrepo);
+			searchQueryParser = new SearchQueryParser(dict);
+		}
+		return searchQueryParser;
+	}
+
+	private SearchRelevanceRanker getSearchRelevanceRanker() {
+		if (searchRelevanceRanker == null) {
+			searchRelevanceRanker = new SearchRelevanceRanker();
+		}
+		return searchRelevanceRanker;
+	}
+
+
 
 	@Autowired(required = false)
 	@org.springframework.context.annotation.Lazy
@@ -211,24 +241,131 @@ public class ProductServiceImpl implements ProductService {
 	        String sort,
 	        String stock,
 	        Integer pageNumber) {
+	    return getAllProducts(query, category, brand, colors, sizes, minPrice, maxPrice, minDiscount, sort, stock, pageNumber, 10);
+	}
 
-	    // Start with search specification
-	    Specification<Product> spec = Specification.where(ProductSpecification.search(query));
+	@Override
+	public Page<Product> getAllProducts(
+	        String query,
+	        String category,
+	        String brand,
+	        String colors,
+	        String sizes,
+	        Integer minPrice,
+	        Integer maxPrice,
+	        Integer minDiscount,
+	        String sort,
+	        String stock,
+	        Integer pageNumber,
+	        Integer pageSize) {
 
-	    // Category Filter (Smart Hierarchical & Suffix/Alias Matching)
+	    int pNumber = (pageNumber != null && pageNumber >= 0) ? pageNumber : 0;
+	    int pSize = (pageSize != null && pageSize > 0) ? Math.min(pageSize, 50) : 10;
+
+	    // Parse and normalize search query (including stop-words, price intent, and typos)
+	    SearchQueryParser.ParsedSearchQuery parsedQuery = getSearchQueryParser().parse(query);
+
+	    // Merge naturally extracted price filters if not explicitly provided
+	    Integer effectiveMinPrice = minPrice != null ? minPrice : parsedQuery.getExtractedMinPrice();
+	    Integer effectiveMaxPrice = maxPrice != null ? maxPrice : parsedQuery.getExtractedMaxPrice();
+
+	    // Build the attribute filter specification
+	    Specification<Product> filterSpec = buildFilterSpecification(
+	            category, brand, colors, sizes, effectiveMinPrice, effectiveMaxPrice, minDiscount, stock
+	    );
+
+	    boolean hasSearchQuery = !parsedQuery.isEmpty();
+	    boolean isRelevanceSort = (sort == null || sort.isBlank() || "relevance".equalsIgnoreCase(sort) || "featured".equalsIgnoreCase(sort));
+
+	    // CASE 1: No text search query -> Standard catalog browsing with direct database pagination
+	    if (!hasSearchQuery) {
+	        Pageable pageable = createPageable(pNumber, pSize, sort);
+	        Page<Product> page = productrepo.findAll(filterSpec, pageable);
+	        enrichProductsWithDeals(page.getContent());
+	        return page;
+	    }
+
+	    // CASE 2: Search with explicit sorting (price_low, price_high, newest, discount) -> Direct DB sorting
+	    if (!isRelevanceSort) {
+	        Specification<Product> searchSpec = Specification.where(
+	                ProductSpecification.search(parsedQuery.getTokens(), true)
+	        ).and(filterSpec);
+
+	        Pageable pageable = createPageable(pNumber, pSize, sort);
+	        Page<Product> page = productrepo.findAll(searchSpec, pageable);
+
+	        // If strict match-all yielded 0 results and query was corrected or multi-token, fallback to soft match
+	        if (page.isEmpty() && (parsedQuery.isCorrected() || parsedQuery.getTokens().size() > 1)) {
+	            Specification<Product> fallbackSpec = Specification.where(
+	                    ProductSpecification.search(parsedQuery.getTokens(), false)
+	            ).and(filterSpec);
+	            page = productrepo.findAll(fallbackSpec, pageable);
+	        }
+
+	        enrichProductsWithDeals(page.getContent());
+	        return page;
+	    }
+
+	    // CASE 3: Search with default/relevance sorting -> Enterprise multi-stage ranking
+	    // Fetch candidates matching search criteria
+	    Specification<Product> searchSpec = Specification.where(
+	            ProductSpecification.search(parsedQuery.getTokens(), true)
+	    ).and(filterSpec);
+
+	    List<Product> candidates = productrepo.findAll(searchSpec);
+
+	    // Fallback: If 0 results and query was corrected or multi-word, try soft-match (any token)
+	    if (candidates.isEmpty() && (parsedQuery.isCorrected() || parsedQuery.getTokens().size() > 1)) {
+	        Specification<Product> fallbackSpec = Specification.where(
+	                ProductSpecification.search(parsedQuery.getTokens(), false)
+	        ).and(filterSpec);
+	        candidates = productrepo.findAll(fallbackSpec);
+	    }
+
+	    // Score and rank all candidate matches by relevance
+	    List<Product> ranked = getSearchRelevanceRanker().rank(candidates, parsedQuery);
+
+	    // Apply pagination
+	    int totalElements = ranked.size();
+	    int fromIndex = pNumber * pSize;
+	    List<Product> pageContent;
+	    if (fromIndex >= totalElements) {
+	        pageContent = Collections.emptyList();
+	    } else {
+	        int toIndex = Math.min(fromIndex + pSize, totalElements);
+	        pageContent = ranked.subList(fromIndex, toIndex);
+	    }
+
+	    enrichProductsWithDeals(pageContent);
+	    return new PageImpl<>(pageContent, PageRequest.of(pNumber, pSize), totalElements);
+	}
+
+	private Specification<Product> buildFilterSpecification(
+	        String category,
+	        String brand,
+	        String colors,
+	        String sizes,
+	        Integer minPrice,
+	        Integer maxPrice,
+	        Integer minDiscount,
+	        String stock) {
+
+	    Specification<Product> spec = Specification.where(null);
+
+	    // Category Filter
 	    if (category != null && !category.isBlank() && !"all".equalsIgnoreCase(category.trim())) {
 	        Set<Long> categoryIds = resolveCategoryIds(category);
 	        if (!categoryIds.isEmpty()) {
 	            spec = spec.and((root, q, cb) -> {
-	                Join<Product, Category> categoryJoin = root.join("category", JoinType.LEFT);
+	                Join<Product, Category> categoryJoin = ProductSpecification.getOrCreateCategoryJoin(root);
 	                return categoryJoin.get("id").in(categoryIds);
 	            });
 	        } else {
 	            String cleanCategory = category.trim().toLowerCase();
 	            spec = spec.and((root, q, cb) -> {
-	                Join<Product, Category> categoryJoin = root.join("category", JoinType.LEFT);
-	                Join<Category, Category> parentJoin = categoryJoin.join("parentCategory", JoinType.LEFT);
-	                Join<Category, Category> grandParentJoin = parentJoin.join("parentCategory", JoinType.LEFT);
+	                Join<Product, Category> categoryJoin = ProductSpecification.getOrCreateCategoryJoin(root);
+	                Join<Category, Category> parentJoin = ProductSpecification.getOrCreateParentJoin(categoryJoin);
+	                Join<Category, Category> grandParentJoin = ProductSpecification.getOrCreateParentJoin(parentJoin);
 
 	                Predicate currentCategory = cb.equal(cb.lower(categoryJoin.get("categoryId")), cleanCategory);
 	                Predicate parentCategory = cb.equal(cb.lower(parentJoin.get("categoryId")), cleanCategory);
@@ -241,115 +378,80 @@ public class ProductServiceImpl implements ProductService {
 
 	    // Brand Filter
 	    if (brand != null && !brand.isBlank()) {
-
 	        spec = spec.and((root, q, cb) ->
-	                cb.like(
-	                        cb.lower(root.get("brand")),
-	                        "%" + brand.toLowerCase() + "%"
-	                ));
+	                cb.like(cb.lower(root.get("brand")), "%" + brand.trim().toLowerCase() + "%")
+	        );
 	    }
 
 	    // Color Filter
 	    if (colors != null && !colors.isBlank()) {
-
 	        spec = spec.and((root, q, cb) ->
-	                cb.like(
-	                        cb.lower(root.get("color")),
-	                        "%" + colors.toLowerCase() + "%"
-	                ));
+	                cb.like(cb.lower(root.get("color")), "%" + colors.trim().toLowerCase() + "%")
+	        );
 	    }
 
 	    // Size Filter
 	    if (sizes != null && !sizes.isBlank()) {
-
 	        spec = spec.and((root, q, cb) ->
-	                cb.equal(
-	                        cb.lower(root.get("sizes")),
-	                        sizes.toLowerCase()
-	                ));
+	                cb.equal(cb.lower(root.get("sizes")), sizes.trim().toLowerCase())
+	        );
 	    }
 
 	    // Min Price
 	    if (minPrice != null) {
-
 	        spec = spec.and((root, q, cb) ->
-	                cb.greaterThanOrEqualTo(
-	                        root.get("sellingPrice"),
-	                        minPrice
-	                ));
+	                cb.greaterThanOrEqualTo(root.get("sellingPrice"), minPrice)
+	        );
 	    }
 
 	    // Max Price
 	    if (maxPrice != null) {
-
 	        spec = spec.and((root, q, cb) ->
-	                cb.lessThanOrEqualTo(
-	                        root.get("sellingPrice"),
-	                        maxPrice
-	                ));
+	                cb.lessThanOrEqualTo(root.get("sellingPrice"), maxPrice)
+	        );
 	    }
 
-	    // Discount
+	    // Min Discount
 	    if (minDiscount != null) {
-
 	        spec = spec.and((root, q, cb) ->
-	                cb.greaterThanOrEqualTo(
-	                        root.get("discountPercent"),
-	                        minDiscount
-	                ));
+	                cb.greaterThanOrEqualTo(root.get("discountPercent"), minDiscount)
+	        );
 	    }
 
 	    // Stock Filter
 	    if (stock != null && !stock.isBlank()) {
-
 	        if (stock.equalsIgnoreCase("in_stock")) {
-
 	            spec = spec.and((root, q, cb) ->
-	                    cb.greaterThan(root.get("quantity"), 0));
-
+	                    cb.greaterThan(root.get("quantity"), 0)
+	            );
 	        } else if (stock.equalsIgnoreCase("out_of_stock")) {
-
 	            spec = spec.and((root, q, cb) ->
-	                    cb.equal(root.get("quantity"), 0));
+	                    cb.or(cb.isNull(root.get("quantity")), cb.equal(root.get("quantity"), 0))
+	            );
 	        }
 	    }
 
-	    Pageable pageable;
-
-	    switch (sort == null ? "" : sort) {
-
-	        case "price_low":
-	            pageable = PageRequest.of(
-	                    pageNumber,
-	                    10,
-	                    Sort.by("sellingPrice").ascending());
-	            break;
-
-	        case "price_high":
-	            pageable = PageRequest.of(
-	                    pageNumber,
-	                    10,
-	                    Sort.by("sellingPrice").descending());
-	            break;
-
-	        case "newest":
-	            pageable = PageRequest.of(
-	                    pageNumber,
-	                    10,
-	                    Sort.by("createdAt").descending());
-	            break;
-
-	        default:
-	            pageable = PageRequest.of(
-	                    pageNumber,
-	                    10,
-	                    Sort.by("id").descending());
-	    }
-
-	    Page<Product> page = productrepo.findAll(spec, pageable);
-	    enrichProductsWithDeals(page.getContent());
-	    return page;
+	    return spec;
 	}
+
+	private Pageable createPageable(int pageNumber, int pageSize, String sort) {
+	    if (sort == null) sort = "";
+	    switch (sort.toLowerCase()) {
+	        case "price_low":
+	            return PageRequest.of(pageNumber, pageSize, Sort.by("sellingPrice").ascending());
+	        case "price_high":
+	            return PageRequest.of(pageNumber, pageSize, Sort.by("sellingPrice").descending());
+	        case "newest":
+	            return PageRequest.of(pageNumber, pageSize, Sort.by("createdAt").descending());
+	        case "rating":
+	            return PageRequest.of(pageNumber, pageSize, Sort.by("numRatings").descending());
+	        case "discount":
+	            return PageRequest.of(pageNumber, pageSize, Sort.by("discountPercent").descending());
+	        default:
+	            return PageRequest.of(pageNumber, pageSize, Sort.by("id").descending());
+	    }
+	}
+
 	@Override
 	public List<Product> getProductsBySellerId(Long sellerId) {
 		
@@ -382,12 +484,68 @@ public class ProductServiceImpl implements ProductService {
 
 	@Override
 	public List<Product> searchProducts(String query) {
-	    Specification<Product> specification = ProductSpecification.search(query);
-	    List<Product> list = productrepo.findAll(specification);
-	    enrichProductsWithDeals(list);
-	    return list;
+	    if (query == null || query.isBlank()) {
+	        return Collections.emptyList();
+	    }
+
+	    SearchQueryParser.ParsedSearchQuery parsedQuery = getSearchQueryParser().parse(query);
+	    if (parsedQuery.isEmpty()) {
+	        return Collections.emptyList();
+	    }
+
+	    Specification<Product> spec = ProductSpecification.search(parsedQuery.getTokens(), true);
+	    List<Product> candidates = productrepo.findAll(spec);
+
+	    // Fallback if strict match-all yielded nothing
+	    if (candidates.isEmpty() && (parsedQuery.isCorrected() || parsedQuery.getTokens().size() > 1)) {
+	        Specification<Product> fallbackSpec = ProductSpecification.search(parsedQuery.getTokens(), false);
+	        candidates = productrepo.findAll(fallbackSpec);
+	    }
+
+	    List<Product> ranked = getSearchRelevanceRanker().rank(candidates, parsedQuery);
+
+	    // Return top 20 relevance-ranked products for search popup / autocomplete
+	    int limit = Math.min(20, ranked.size());
+	    List<Product> result = limit > 0 ? new ArrayList<>(ranked.subList(0, limit)) : Collections.emptyList();
+	    enrichProductsWithDeals(result);
+	    return result;
 	}
 
+	@Override
+	public List<String> getSearchSuggestions(String query, int limit) {
+	    if (query == null || query.isBlank()) {
+	        return Collections.emptyList();
+	    }
+
+	    int maxLimit = (limit > 0) ? Math.min(limit, 15) : 8;
+	    SearchQueryParser.ParsedSearchQuery parsedQuery = getSearchQueryParser().parse(query);
+	    if (parsedQuery.isEmpty()) {
+	        return Collections.emptyList();
+	    }
+
+	    List<Product> matches = searchProducts(query);
+	    Set<String> suggestions = new java.util.LinkedHashSet<>();
+
+	    // Add exact/prefix product titles first
+	    for (Product p : matches) {
+	        if (p.getTitle() != null && !p.getTitle().isBlank()) {
+	            suggestions.add(p.getTitle().trim());
+	            if (suggestions.size() >= maxLimit) break;
+	        }
+	    }
+
+	    // Add matching brand suggestions if space permits
+	    if (suggestions.size() < maxLimit) {
+	        for (Product p : matches) {
+	            if (p.getBrand() != null && !p.getBrand().isBlank()) {
+	                suggestions.add(p.getBrand().trim());
+	                if (suggestions.size() >= maxLimit) break;
+	            }
+	        }
+	    }
+
+	    return new ArrayList<>(suggestions);
+	}
 
 	@Override
 	public List<Product> searchProductsByCategory(String category) {

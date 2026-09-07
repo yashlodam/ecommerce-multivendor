@@ -52,7 +52,8 @@ public class ProductController {
             @RequestParam(required = false) Integer minDiscount,
             @RequestParam(required = false) String sort,
             @RequestParam(required = false) String stock,
-            @RequestParam(defaultValue = "0") Integer pageNumber) {
+            @RequestParam(defaultValue = "0") Integer pageNumber,
+            @RequestParam(defaultValue = "10") Integer pageSize) {
 
         Page<Product> products = productservice.getAllProducts(
                 query,
@@ -65,10 +66,20 @@ public class ProductController {
                 minDiscount,
                 sort,
                 stock,
-                pageNumber
+                pageNumber,
+                pageSize
         );
 
         return ResponseEntity.ok(products);
+    }
+
+    @GetMapping("/suggestions")
+    @Operation(summary = "Get lightweight search suggestions for type-ahead / autocomplete")
+    public ResponseEntity<List<String>> getSearchSuggestions(
+            @RequestParam String query,
+            @RequestParam(defaultValue = "8") Integer limit) {
+        List<String> suggestions = productservice.getSearchSuggestions(query, limit);
+        return ResponseEntity.ok(suggestions);
     }
 
     @GetMapping("/brands")

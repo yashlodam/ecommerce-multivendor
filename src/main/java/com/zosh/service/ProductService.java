@@ -30,6 +30,20 @@ public interface ProductService {
             String stock,
             Integer pageNumber);
 
+    Page<Product> getAllProducts(
+            String query,
+            String category,
+            String brand,
+            String colors,
+            String sizes,
+            Integer minPrice,
+            Integer maxPrice,
+            Integer minDiscount,
+            String sort,
+            String stock,
+            Integer pageNumber,
+            Integer pageSize);
+
     List<Product> getProductsBySellerId(Long sellerId);
 
     List<Product> getFeaturedProducts();
@@ -38,6 +52,8 @@ public interface ProductService {
 
     // ─── Search ────────────────────────────────────────────────────
     List<Product> searchProducts(String query);
+
+    List<String> getSearchSuggestions(String query, int limit);
 
     List<Product> searchProductsByCategory(String category);
 

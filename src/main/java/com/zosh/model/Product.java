@@ -43,7 +43,11 @@ import jakarta.persistence.Version;
     indexes = {
         @Index(name = "idx_product_seller",   columnList = "seller_id"),
         @Index(name = "idx_product_category", columnList = "category_id"),
-        @Index(name = "idx_product_created",  columnList = "created_at")
+        @Index(name = "idx_product_created",  columnList = "created_at"),
+        @Index(name = "idx_product_title",    columnList = "title"),
+        @Index(name = "idx_product_brand",    columnList = "brand"),
+        @Index(name = "idx_product_price",    columnList = "sellingPrice"),
+        @Index(name = "idx_product_quantity", columnList = "quantity")
     }
 )
 @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
