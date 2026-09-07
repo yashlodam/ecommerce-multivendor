@@ -262,9 +262,11 @@ public class PaymentServiceImpl implements PaymentService {
                 log.info("Payment {} is authorized; attempting auto-capture...", paymentId);
                 try {
                     JSONObject captureRequest = new JSONObject();
-                    captureRequest.put("amount", payment.get("amount"));
-                    captureRequest.put("currency", payment.get("currency"));
-                    payment = payment.capture(captureRequest);
+                    Object amt = payment.get("amount");
+                    Object cur = payment.get("currency");
+                    captureRequest.put("amount", amt != null ? Long.parseLong(amt.toString()) : paymentOrder.getAmount() * 100);
+                    captureRequest.put("currency", cur != null ? cur.toString() : "INR");
+                    payment = razorpay.payments.capture(paymentId, captureRequest);
                     status = payment.get("status");
                     log.info("Payment {} captured status: {}", paymentId, status);
                 } catch (Exception capEx) {
