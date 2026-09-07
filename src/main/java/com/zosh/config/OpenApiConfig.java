@@ -93,7 +93,7 @@ public class OpenApiConfig {
         if (httpMethod.equalsIgnoreCase("GET") && (path.startsWith("/products") || path.startsWith("/home") || path.equals("/"))) return true;
         if (httpMethod.equalsIgnoreCase("GET") && path.contains("/reviews")) return true;
         if (path.startsWith("/api/chat")) return true;
-        if (path.startsWith("/actuator/health")) return true;
+        if (path.equals("/health") || path.startsWith("/actuator/health")) return true;
         if (httpMethod.equalsIgnoreCase("POST") && (path.equals("/sellers/login") || path.equals("/sellers"))) return true;
         if (httpMethod.equalsIgnoreCase("PATCH") && path.startsWith("/sellers/verify")) return true;
         if (path.startsWith("/v3/api-docs") || path.startsWith("/swagger-ui")) return true;

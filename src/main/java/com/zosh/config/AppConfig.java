@@ -85,6 +85,7 @@ public class AppConfig {
                 .requestMatchers(HttpMethod.GET, "/api/deals/**").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/coupons/active").permitAll()
                 .requestMatchers(HttpMethod.GET, "/").permitAll()
+                .requestMatchers("/health").permitAll()
                 .requestMatchers("/actuator/health", "/actuator/health/**").permitAll()
 
                 // AI Shopping Assistant — session-level auth handled in service
