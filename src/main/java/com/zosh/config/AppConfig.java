@@ -18,6 +18,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.security.web.access.AccessDeniedHandler;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.web.cors.CorsConfigurationSource;
 
 /**
  * Central Spring Security configuration.
@@ -40,6 +41,9 @@ public class AppConfig {
     @Autowired
     private JwtTokenValidator jwtTokenValidator;
 
+    @Autowired
+    private CorsConfigurationSource corsConfigurationSource;
+
     @Bean
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();
@@ -57,7 +61,7 @@ public class AppConfig {
         http
             .sessionManagement(session ->
                     session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-            .cors(cors -> {})                     // CorsConfig bean handles CORS
+            .cors(cors -> cors.configurationSource(corsConfigurationSource))                     // CorsConfig bean handles CORS
             .csrf(csrf -> csrf.disable())          // CSRF not needed for stateless JWT APIs
             .exceptionHandling(ex -> ex
                 .authenticationEntryPoint((request, response, authException) -> {
