@@ -76,7 +76,6 @@ public class AuthController {
         cookieService.attachRefreshTokenCookie(httpResponse, refreshToken.getToken());
 
         AuthResponse res = new AuthResponse(jwt, "Registered successfully", USER_ROLE.ROLE_CUSTOMER);
-        res.setRefreshToken(refreshToken.getToken());
         return ResponseEntity.ok(res);
     }
 
@@ -107,8 +106,6 @@ public class AuthController {
         // Issue refresh token and attach HttpOnly cookie
         RefreshToken refreshToken = refreshTokenService.createRefreshToken(actualEmail);
         cookieService.attachRefreshTokenCookie(httpResponse, refreshToken.getToken());
-
-        response.setRefreshToken(refreshToken.getToken());
 
         return ResponseEntity.ok(response);
     }
@@ -150,7 +147,6 @@ public class AuthController {
             cookieService.attachRefreshTokenCookie(httpResponse, rotatedToken.getToken());
 
             AuthResponse authResponse = new AuthResponse(newAccessToken, "Token refreshed successfully", role);
-            authResponse.setRefreshToken(rotatedToken.getToken());
 
             return ResponseEntity.ok(authResponse);
 

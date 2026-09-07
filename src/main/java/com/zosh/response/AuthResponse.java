@@ -1,5 +1,6 @@
 package com.zosh.response;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.zosh.domain.USER_ROLE;
 
 public class AuthResponse {
@@ -8,6 +9,7 @@ public class AuthResponse {
 	private String message;
 	private USER_ROLE role;
 
+	@JsonIgnore
 	private String refreshToken;
 
 	public AuthResponse() {

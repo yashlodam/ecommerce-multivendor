@@ -24,6 +24,7 @@ import com.zosh.exceptions.DuplicateResourceException;
 import com.zosh.exceptions.OtpExpiredException;
 import com.zosh.exceptions.ResourceNotFoundException;
 import com.zosh.exceptions.SellerException;
+import com.zosh.model.RefreshToken;
 import com.zosh.model.Seller;
 import com.zosh.model.SellerReport;
 import com.zosh.model.VerificationCode;
@@ -32,13 +33,16 @@ import com.zosh.request.SellerRequest;
 import com.zosh.response.AuthResponse;
 import com.zosh.response.LoginRequest;
 import com.zosh.service.AuthService;
+import com.zosh.service.CookieService;
 import com.zosh.service.EmailService;
+import com.zosh.service.RefreshTokenService;
 import com.zosh.service.SellerReportService;
 import com.zosh.service.SellerService;
 import com.zosh.utils.OtpUtil;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 
 @RestController
@@ -64,6 +68,12 @@ public class SellerController {
     @Autowired
     private SellerReportService sellerReportService;
 
+    @Autowired
+    private RefreshTokenService refreshTokenService;
+
+    @Autowired
+    private CookieService cookieService;
+
     @Value("${app.otp.expiry-minutes:10}")
     private int otpExpiryMinutes;
 
@@ -71,10 +81,21 @@ public class SellerController {
 
     @PostMapping("/login")
     @Operation(summary = "Authenticate a seller account using email and OTP / password")
-    public ResponseEntity<AuthResponse> loginSeller(@Valid @RequestBody LoginRequest req) {
+    public ResponseEntity<AuthResponse> loginSeller(
+            @Valid @RequestBody LoginRequest req,
+            HttpServletResponse httpResponse) {
+        String cleanEmail = req.getEmail().startsWith("seller_")
+                ? req.getEmail().substring("seller_".length())
+                : req.getEmail();
+
         // Prefix distinguishes seller auth from customer auth in UserDetailsService
-        req.setEmail("seller_" + req.getEmail());
+        req.setEmail("seller_" + cleanEmail);
         AuthResponse res = authService.siging(req);
+
+        // Issue refresh token and attach HttpOnly cookie
+        RefreshToken refreshToken = refreshTokenService.createRefreshToken(cleanEmail);
+        cookieService.attachRefreshTokenCookie(httpResponse, refreshToken.getToken());
+
         return ResponseEntity.ok(res);
     }
 

@@ -84,6 +84,7 @@ class AuthControllerTest {
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertNotNull(response.getBody());
         assertEquals("access-jwt-123", response.getBody().getJwt());
+        assertNull(response.getBody().getRefreshToken(), "Refresh token must never be exposed in JSON body");
 
         String setCookie = httpResponse.getHeader("Set-Cookie");
         assertNotNull(setCookie);
@@ -114,6 +115,7 @@ class AuthControllerTest {
         assertNotNull(response.getBody());
         assertEquals("new-access-jwt-999", response.getBody().getJwt());
         assertEquals(USER_ROLE.ROLE_CUSTOMER, response.getBody().getRole());
+        assertNull(response.getBody().getRefreshToken(), "Refresh token must never be exposed in JSON body");
 
         String setCookie = httpResponse.getHeader("Set-Cookie");
         assertNotNull(setCookie);
