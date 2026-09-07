@@ -195,7 +195,7 @@ public class DealServiceImpl implements DealService {
             throw new IllegalArgumentException("Percentage discount cannot exceed 100%.");
         }
 
-        LocalDateTime startAt = req.getStartAt() != null ? req.getStartAt() : LocalDateTime.now();
+        LocalDateTime startAt = req.getStartAt() != null ? req.getStartAt() : LocalDateTime.now().minusMinutes(2);
         LocalDateTime endAt = req.getEndAt() != null ? req.getEndAt() : startAt.plusMonths(1);
 
         if (endAt.isBefore(startAt)) {
