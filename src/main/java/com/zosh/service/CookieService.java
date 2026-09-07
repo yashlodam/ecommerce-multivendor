@@ -30,9 +30,12 @@ public class CookieService {
      * Builds an HttpOnly, Secure, SameSite ResponseCookie containing the refresh token.
      */
     public ResponseCookie createRefreshTokenCookie(String token) {
+        boolean isNone = "None".equalsIgnoreCase(cookieSameSite);
+        boolean secureFlag = isNone || cookieSecure;
+
         return ResponseCookie.from(REFRESH_TOKEN_COOKIE_NAME, token)
                 .httpOnly(true)
-                .secure(cookieSecure)
+                .secure(secureFlag)
                 .sameSite(cookieSameSite)
                 .path("/")
                 .maxAge(Duration.ofDays(refreshTokenExpirationDays))
@@ -43,9 +46,12 @@ public class CookieService {
      * Builds an expired clearing cookie to remove the refresh token from the client browser.
      */
     public ResponseCookie createCleanRefreshTokenCookie() {
+        boolean isNone = "None".equalsIgnoreCase(cookieSameSite);
+        boolean secureFlag = isNone || cookieSecure;
+
         return ResponseCookie.from(REFRESH_TOKEN_COOKIE_NAME, "")
                 .httpOnly(true)
-                .secure(cookieSecure)
+                .secure(secureFlag)
                 .sameSite(cookieSameSite)
                 .path("/")
                 .maxAge(0)
