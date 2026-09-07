@@ -28,20 +28,28 @@ public class HomeServiceImpl implements HomeService {
 	@Override
 	public Home createHomePageData(List<HomeCategory> allCategories) {
 
+	    java.util.Comparator<HomeCategory> priorityComparator = java.util.Comparator
+	            .comparing(HomeCategory::getPriority, java.util.Comparator.nullsLast(java.util.Comparator.naturalOrder()))
+	            .thenComparing(HomeCategory::getId, java.util.Comparator.nullsLast(java.util.Comparator.naturalOrder()));
+
 	    List<HomeCategory> gridCategories = allCategories.stream()
 	            .filter(category -> category.getSection() == HomeCategorySection.GRID)
+	            .sorted(priorityComparator)
 	            .collect(Collectors.toList());
 
 	    List<HomeCategory> shopByCategories = allCategories.stream()
 	            .filter(category -> category.getSection() == HomeCategorySection.SHOP_BY_CATEGORIES)
+	            .sorted(priorityComparator)
 	            .collect(Collectors.toList());
 
 	    List<HomeCategory> electricCategories = allCategories.stream()
 	            .filter(category -> category.getSection() == HomeCategorySection.ELECTRIC_CATEGORIES)
+	            .sorted(priorityComparator)
 	            .collect(Collectors.toList());
 
 	    List<HomeCategory> dealCategories = allCategories.stream()
 	            .filter(category -> category.getSection() == HomeCategorySection.DEALS)
+	            .sorted(priorityComparator)
 	            .collect(Collectors.toList());
 	    List<Deal> createdDeals = new ArrayList<>();
 	    

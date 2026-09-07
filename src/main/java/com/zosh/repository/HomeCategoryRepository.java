@@ -13,4 +13,8 @@ public interface HomeCategoryRepository extends JpaRepository<HomeCategory, Long
     Optional<HomeCategory> findByCategoryId(String categoryId);
 
     List<HomeCategory> findBySection(HomeCategorySection section);
+
+    List<HomeCategory> findAllByOrderByPriorityAscIdAsc();
+
+    List<HomeCategory> findBySectionOrderByPriorityAscIdAsc(HomeCategorySection section);
 }
