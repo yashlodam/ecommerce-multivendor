@@ -28,7 +28,7 @@ public class JwtProvider {
     @Value("${app.jwt.secret:ShopSphereDefaultSecretKeyForTokenSigningInDevelopmentAndStagingOnlyMustBeLongEnough64Bytes}")
     private String secretKey;
 
-    @Value("${app.jwt.access-token-expiration-ms:${app.jwt.expiration-ms:900000}}")
+    @Value("${app.jwt.access-token-expiration-ms:${app.jwt.expiration-ms:86400000}}")
     private long expirationMs;
 
     private SecretKey key;
